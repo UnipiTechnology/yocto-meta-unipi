@@ -1,0 +1,108 @@
+From 29d7718d8dc13353687d2638ff5a6376aecef8e9 Mon Sep 17 00:00:00 2001
+From: Miroslav Ondra <ondra@faster.cz>
+Date: Fri, 20 Sep 2024 17:06:01 +0200
+Subject: [PATCH 6/6] Add mctrl_gpio support to amba-pl011 serial driver
+
+---
+ drivers/tty/serial/amba-pl011.c | 23 +++++++++++++++++------
+ drivers/tty/serial/rxtxled.c    |  4 ++--
+ 2 files changed, 19 insertions(+), 8 deletions(-)
+
+diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
+index de5885766..8e91d74f2 100644
+--- a/drivers/tty/serial/amba-pl011.c
++++ b/drivers/tty/serial/amba-pl011.c
+@@ -42,6 +42,7 @@
+ #include <linux/io.h>
+ #include <linux/acpi.h>
+ #include "rxtxled.h"
++#include "serial_mctrl_gpio.h"
+ 
+ #define UART_NR			14
+ 
+@@ -288,6 +289,7 @@ struct uart_amba_port {
+ 	bool			dma_probed;
+ #endif
+ 	void *led_trigger_data;
++	struct mctrl_gpios *gpios;
+ };
+ 
+ static unsigned int pl011_tx_empty(struct uart_port *port);
+@@ -1328,11 +1330,13 @@ static void pl011_rs485_tx_stop(struct uart_amba_port *uap)
+ 
+ 	cr = pl011_read(uap, REG_CR);
+ 
+-	if (port->rs485.flags & SER_RS485_RTS_AFTER_SEND)
++	if (port->rs485.flags & SER_RS485_RTS_AFTER_SEND) {
++		mctrl_gpio_set(uap->gpios, uap->port.mctrl | TIOCM_RTS);
+ 		cr &= ~UART011_CR_RTS;
+-	else
++	} else {
++		mctrl_gpio_set(uap->gpios, uap->port.mctrl & ~TIOCM_RTS);
+ 		cr |= UART011_CR_RTS;
+-
++	}
+ 	/* Disable the transmitter and reenable the transceiver */
+ 	cr &= ~UART011_CR_TXE;
+ 	cr |= UART011_CR_RXE;
+@@ -1378,11 +1382,13 @@ static void pl011_rs485_tx_start(struct uart_amba_port *uap)
+ 	if (!(port->rs485.flags & SER_RS485_RX_DURING_TX))
+ 		cr &= ~UART011_CR_RXE;
+ 
+-	if (port->rs485.flags & SER_RS485_RTS_ON_SEND)
++	if (port->rs485.flags & SER_RS485_RTS_ON_SEND) {
++		mctrl_gpio_set(uap->gpios, uap->port.mctrl | TIOCM_RTS);
+ 		cr &= ~UART011_CR_RTS;
+-	else
++	} else {
++		mctrl_gpio_set(uap->gpios, uap->port.mctrl & ~TIOCM_RTS);
+ 		cr |= UART011_CR_RTS;
+-
++	}
+ 	pl011_write(cr, uap, REG_CR);
+ 
+ 	if (port->rs485.delay_rts_before_send)
+@@ -1672,6 +1678,7 @@ static void pl011_set_mctrl(struct uart_port *port, unsigned int mctrl)
+ #undef TIOCMBIT
+ 
+ 	pl011_write(cr, uap, REG_CR);
++	mctrl_gpio_set(uap->gpios, mctrl);
+ }
+ 
+ static void pl011_break_ctl(struct uart_port *port, int break_state)
+@@ -2874,6 +2881,10 @@ static int pl011_probe(struct amba_device *dev, const struct amba_id *id)
+ 	if (ret)
+ 		return ret;
+ 
++	uap->gpios = mctrl_gpio_init(&uap->port, 0);
++	if (IS_ERR(uap->gpios))
++		return PTR_ERR(uap->gpios);
++
+ 	amba_set_drvdata(dev, uap);
+ 
+ 	return pl011_register_port(uap);
+diff --git a/drivers/tty/serial/rxtxled.c b/drivers/tty/serial/rxtxled.c
+index 9053ac2bb..4d9403b21 100644
+--- a/drivers/tty/serial/rxtxled.c
++++ b/drivers/tty/serial/rxtxled.c
+@@ -45,7 +45,7 @@ void rxtx_rx_led_activity(void* data, int ev)
+ 
+ 	if (lp) {
+ 		/* led_trigger_blink_oneshot() handles trig == NULL gracefully */
+-		led_trigger_blink_oneshot(lp->rx_led_trig, &rxtx_blink_delay, &rxtx_blink_delay, 0);
++		led_trigger_blink_oneshot(lp->rx_led_trig, rxtx_blink_delay, rxtx_blink_delay, 0);
+ 	}
+ }
+ 
+@@ -55,7 +55,7 @@ void rxtx_tx_led_activity(void* data, int ev)
+     //printk(KERN_INFO "RXTX-TX: lp=%x\n", lp);
+ 	if (lp) {
+ 		/* led_trigger_blink_oneshot() handles trig == NULL gracefully */
+-		led_trigger_blink_oneshot(lp->tx_led_trig, &rxtx_blink_delay, &rxtx_blink_delay, 0);
++		led_trigger_blink_oneshot(lp->tx_led_trig, rxtx_blink_delay, rxtx_blink_delay, 0);
+ 	}
+ }
+ 
+-- 
+2.39.2
+

@@ -1,0 +1,26 @@
+From 0a9b5c35c74d93834f42f07e67eab6695682f778 Mon Sep 17 00:00:00 2001
+From: Miroslav Ondra <ondra@faster.cz>
+Date: Tue, 20 Jun 2023 17:37:44 +0200
+Subject: [PATCH] Remove uart4 from M4 domain
+
+---
+ plat/imx/imx8m/imx8mm/imx8mm_bl31_setup.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/plat/imx/imx8m/imx8mm/imx8mm_bl31_setup.c b/plat/imx/imx8m/imx8mm/imx8mm_bl31_setup.c
+index 8702d51..6ba3a02 100644
+--- a/plat/imx/imx8m/imx8mm/imx8mm_bl31_setup.c
++++ b/plat/imx/imx8m/imx8mm/imx8mm_bl31_setup.c
+@@ -108,7 +108,8 @@ static const struct imx_rdc_cfg rdc[] = {
+ 	RDC_MDAn(RDC_MDA_M4, DID1),
+ 
+ 	/* peripherals domain permission */
+-	RDC_PDAPn(RDC_PDAP_UART4, D1R | D1W),
++	RDC_PDAPn(RDC_PDAP_UART4, D0R | D0W),
++	RDC_PDAPn(RDC_PDAP_UART3, D0R | D0W),
+ 	RDC_PDAPn(RDC_PDAP_UART2, D0R | D0W),
+ 	RDC_PDAPn(RDC_PDAP_UART1, D0R | D0W),
+ 
+-- 
+2.30.2
+

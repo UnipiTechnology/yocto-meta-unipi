@@ -1,0 +1,266 @@
+From 21b31bdeae0dc30f8d4db5285929801419765532 Mon Sep 17 00:00:00 2001
+From: Miroslav Ondra <ondra@faster.cz>
+Date: Thu, 27 Jun 2024 15:58:36 +0200
+Subject: [PATCH 2/3] Add RxTx led on amba-pl011
+
+---
+ drivers/tty/serial/Kconfig      |   9 +++
+ drivers/tty/serial/Makefile     |   2 +
+ drivers/tty/serial/amba-pl011.c |  15 +++++
+ drivers/tty/serial/rxtxled.c    | 106 ++++++++++++++++++++++++++++++++
+ drivers/tty/serial/rxtxled.h    |  18 ++++++
+ 5 files changed, 150 insertions(+)
+ create mode 100644 drivers/tty/serial/rxtxled.c
+ create mode 100644 drivers/tty/serial/rxtxled.h
+
+diff --git a/drivers/tty/serial/Kconfig b/drivers/tty/serial/Kconfig
+index bdc568a4a..c29ba9bef 100644
+--- a/drivers/tty/serial/Kconfig
++++ b/drivers/tty/serial/Kconfig
+@@ -1578,6 +1578,15 @@ config SERIAL_NUVOTON_MA35D1_CONSOLE
+ 	  but you can alter that using a kernel command line option such as
+ 	  "console=ttyNVTx".
+ 
++config RXTX_LED_TRIG
++	bool "RXTX Serial LED Triggers"
++	depends on LEDS_CLASS && LEDS_TRIGGERS && (SERIAL_IMX || SERIAL_8250_DW || SERIAL_AMBA_PL011)
++	help
++	  This option adds LED triggers for RX/TX serial activity.
++
++	  Say Y here if you are working on a system with led-class supported
++	  LEDs and you want to use them as activity indicators for serial port.
++
+ endmenu
+ 
+ config SERIAL_MCTRL_GPIO
+diff --git a/drivers/tty/serial/Makefile b/drivers/tty/serial/Makefile
+index 138abbc89..a695aa400 100644
+--- a/drivers/tty/serial/Makefile
++++ b/drivers/tty/serial/Makefile
+@@ -95,3 +95,5 @@ obj-$(CONFIG_SERIAL_MCTRL_GPIO)	+= serial_mctrl_gpio.o
+ obj-$(CONFIG_SERIAL_KGDB_NMI) += kgdb_nmi.o
+ obj-$(CONFIG_KGDB_SERIAL_CONSOLE) += kgdboc.o
+ obj-$(CONFIG_SERIAL_NUVOTON_MA35D1) += ma35d1_serial.o
++
++obj-$(CONFIG_RXTX_LED_TRIG) += rxtxled.o
+diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
+index a5717655b..de5885766 100644
+--- a/drivers/tty/serial/amba-pl011.c
++++ b/drivers/tty/serial/amba-pl011.c
+@@ -41,6 +41,7 @@
+ #include <linux/sizes.h>
+ #include <linux/io.h>
+ #include <linux/acpi.h>
++#include "rxtxled.h"
+ 
+ #define UART_NR			14
+ 
+@@ -286,6 +287,7 @@ struct uart_amba_port {
+ 	struct pl011_dmatx_data	dmatx;
+ 	bool			dma_probed;
+ #endif
++	void *led_trigger_data;
+ };
+ 
+ static unsigned int pl011_tx_empty(struct uart_port *port);
+@@ -369,6 +371,8 @@ static int pl011_fifo_to_tty(struct uart_amba_port *uap)
+ 			uart_insert_char(&uap->port, ch, UART011_DR_OE, ch, flag);
+ 	}
+ 
++	if (fifotaken) rxtx_rx_led_activity(uap->led_trigger_data, 1);
++
+ 	return fifotaken;
+ }
+ 
+@@ -688,6 +692,7 @@ static int pl011_dma_tx_refill(struct uart_amba_port *uap)
+ 	 * with the stuff we just dispatched.
+ 	 */
+ 	uart_xmit_advance(&uap->port, count);
++	rxtx_tx_led_activity(uap->led_trigger_data, 1);
+ 
+ 	if (uart_circ_chars_pending(xmit) < WAKEUP_CHARS)
+ 		uart_write_wakeup(&uap->port);
+@@ -916,6 +921,7 @@ static void pl011_dma_rx_chars(struct uart_amba_port *uap,
+ 		if (dma_count < pending)
+ 			dev_warn(uap->port.dev,
+ 				 "couldn't insert all characters (TTY is full?)\n");
++		rxtx_rx_led_activity(uap->led_trigger_data,1);
+ 	}
+ 
+ 	/* Reset the last_residue for Rx DMA poll */
+@@ -1436,6 +1442,8 @@ __acquires(&uap->port.lock)
+ 
+ 	spin_unlock(&uap->port.lock);
+ 	tty_flip_buffer_push(&uap->port.state->port);
++	//rxtx_rx_led_activity(uap->led_trigger_data, 1);
++
+ 	/*
+ 	 * If we were temporarily out of DMA mode for a while,
+ 	 * attempt to switch back to DMA mode again.
+@@ -1472,6 +1480,7 @@ static bool pl011_tx_char(struct uart_amba_port *uap, unsigned char c,
+ 	pl011_write(c, uap, REG_DR);
+ 	mb();
+ 	uap->port.icount.tx++;
++	rxtx_tx_led_activity(uap->led_trigger_data, 1);
+ 
+ 	return true;
+ }
+@@ -2767,6 +2776,11 @@ static int pl011_setup_port(struct device *dev, struct uart_amba_port *uap,
+ 	if (ret)
+ 		return ret;
+ 
++#ifdef CONFIG_RXTX_LED_TRIG
++	uap->led_trigger_data = rxtx_add_one_port("ttyAMA", uap->port.line);
++#else
++	uap->led_trigger_data = NULL;
++#endif
+ 	amba_ports[index] = uap;
+ 
+ 	return 0;
+@@ -2869,6 +2883,7 @@ static void pl011_remove(struct amba_device *dev)
+ {
+ 	struct uart_amba_port *uap = amba_get_drvdata(dev);
+ 
++	rxtx_remove_one_port(uap->led_trigger_data);
+ 	uart_remove_one_port(&amba_reg, &uap->port);
+ 	pl011_unregister_port(uap);
+ }
+diff --git a/drivers/tty/serial/rxtxled.c b/drivers/tty/serial/rxtxled.c
+new file mode 100644
+index 000000000..9053ac2bb
+--- /dev/null
++++ b/drivers/tty/serial/rxtxled.c
+@@ -0,0 +1,106 @@
++/*
++ * LED Triggers for RX/TX Serial Activity
++ *
++ * Copyright 2018 Miroslav Ondra <ondra@faster.cz>
++ *
++ * Copyright 2014 Michal Sojka <sojka@merica.cz>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ */
++
++#include <linux/module.h>
++#include <linux/kernel.h>
++#include <linux/slab.h>
++#include <linux/init.h>
++#include <linux/leds.h>
++//#include <linux/serial_8250.h>
++
++
++#define RXTX_BLINK_DELAY 30
++#define TTY_TRIG_NAME_MAX  TRIG_NAME_MAX
++
++static unsigned long rxtx_blink_delay = RXTX_BLINK_DELAY;
++
++
++struct rxtx_data
++{
++	char tx_led_trig_name[TTY_TRIG_NAME_MAX];
++	char rx_led_trig_name[TTY_TRIG_NAME_MAX];
++	struct led_trigger *tx_led_trig;
++	struct led_trigger *rx_led_trig;
++};
++
++/*DEFINE_LED_TRIGGER(ledtrig_serial_rx);
++DEFINE_LED_TRIGGER(ledtrig_serial_tx);
++*/
++
++void rxtx_rx_led_activity(void* data, int ev)
++{
++	struct rxtx_data *lp = (struct rxtx_data*) data;
++
++    //printk(KERN_INFO "RXTX-RX: lp=%x\n", lp);
++
++	if (lp) {
++		/* led_trigger_blink_oneshot() handles trig == NULL gracefully */
++		led_trigger_blink_oneshot(lp->rx_led_trig, &rxtx_blink_delay, &rxtx_blink_delay, 0);
++	}
++}
++
++void rxtx_tx_led_activity(void* data, int ev)
++{
++	struct rxtx_data *lp = (struct rxtx_data*) data;
++    //printk(KERN_INFO "RXTX-TX: lp=%x\n", lp);
++	if (lp) {
++		/* led_trigger_blink_oneshot() handles trig == NULL gracefully */
++		led_trigger_blink_oneshot(lp->tx_led_trig, &rxtx_blink_delay, &rxtx_blink_delay, 0);
++	}
++}
++
++EXPORT_SYMBOL_GPL(rxtx_rx_led_activity);
++EXPORT_SYMBOL_GPL(rxtx_tx_led_activity);
++
++void* rxtx_add_one_port(const char* name, int nameline)
++{
++	struct rxtx_data* lp;
++
++	lp = kzalloc(sizeof(struct rxtx_data), GFP_KERNEL);
++	if (lp) {
++		snprintf(lp->tx_led_trig_name, sizeof(lp->tx_led_trig_name),
++			"%s%d-tx", name, nameline);
++		snprintf(lp->rx_led_trig_name, sizeof(lp->rx_led_trig_name),
++			"%s%d-rx", name, nameline);
++		led_trigger_register_simple(lp->tx_led_trig_name, &lp->tx_led_trig);
++		led_trigger_register_simple(lp->rx_led_trig_name, &lp->rx_led_trig);
++	}
++	return lp;
++}
++
++
++void rxtx_remove_one_port(void* data)
++{
++	struct rxtx_data *lp = (struct rxtx_data*) data;
++	if (lp) {
++		led_trigger_unregister_simple(lp->tx_led_trig);
++		led_trigger_unregister_simple(lp->rx_led_trig);
++		kfree(lp);
++	}
++}
++
++EXPORT_SYMBOL_GPL(rxtx_add_one_port);
++EXPORT_SYMBOL_GPL(rxtx_remove_one_port);
++
++static int __init ledtrig_rxtx_init(void)
++{
++    return 0;
++}
++
++static void __exit ledtrig_rxtx_exit(void)
++{
++
++}
++
++module_init(ledtrig_rxtx_init);
++module_exit(ledtrig_rxtx_exit);
+diff --git a/drivers/tty/serial/rxtxled.h b/drivers/tty/serial/rxtxled.h
+new file mode 100644
+index 000000000..f1a9f06a9
+--- /dev/null
++++ b/drivers/tty/serial/rxtxled.h
+@@ -0,0 +1,18 @@
++// SPDX-License-Identifier: GPL-2.0
++#ifndef __RXTXLED_H
++#define __RXTXLED_H
++
++
++#ifdef CONFIG_RXTX_LED_TRIG
++extern void * rxtx_add_one_port(const char *name, int nameline);
++extern void rxtx_remove_one_port(void* data);
++extern void rxtx_rx_led_activity(void* data, int ev);
++extern void rxtx_tx_led_activity(void* data, int ev);
++#else
++static inline void* rxtx_add_one_port(char *name, int nameline) {return NULL;}
++static inline void rxtx_remove_one_port(void* data) {}
++static inline void rxtx_rx_led_activity(void* data, int ev) {}
++static inline void rxtx_tx_led_activity(void* data, int ev) {}
++#endif
++
++#endif
+-- 
+2.30.2
+

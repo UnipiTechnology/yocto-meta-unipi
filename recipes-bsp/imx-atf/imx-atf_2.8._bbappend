@@ -1,0 +1,3 @@
+SRC_URI += " file://0001-Remove-uart4-from-M4-domain.patch"
+FILESEXTRAPATHS:prepend := "${THISDIR}/imx-atf:"
+COMPATIBLE_MACHINE = "(zulu)"

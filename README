@@ -1,0 +1,38 @@
+This README file contains information on the contents of the meta-unipi layer.
+
+Please see the corresponding sections below for details.
+
+Dependencies
+============
+
+  URI: git@github.com:agherzan/meta-raspberrypi
+  branch: scarthgap
+
+  .
+  .
+  .
+
+Patches
+=======
+
+Please submit any patches against the meta-unipi layer to the xxxx mailing list (xxxx@zzzz.org)
+and cc: the maintainer:
+
+Maintainer: Miroslav Ondra <ondra@unipi.technology>
+
+Table of Contents
+=================
+
+  I. Adding the meta-unipi layer to your build
+ II. Misc
+
+
+I. Adding the meta-unipi layer to your build
+=================================================
+
+Run 'bitbake-layers add-layer meta-unipi'
+
+II. Misc
+========
+
+--- replace with specific information about the meta-unipi layer ---

@@ -1,0 +1,24 @@
+From 9af62472ac8a4e29fb44d76f3614bbd2d94e3f45 Mon Sep 17 00:00:00 2001
+From: Miroslav Ondra <ondra@faster.cz>
+Date: Mon, 10 Feb 2025 14:23:21 +0100
+Subject: [PATCH] Fix btuart on RPi4
+
+---
+ usr/bin/btuart | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/usr/bin/btuart b/usr/bin/btuart
+index 493fd86..237e7be 100755
+--- a/usr/bin/btuart
++++ b/usr/bin/btuart
+@@ -2,6 +2,7 @@
+ 
+ HCIATTACH=/usr/bin/hciattach
+ if grep -q "raspberrypi,4" /proc/device-tree/compatible; then
++  exit 0
+   BDADDR=
+ else
+   SERIAL=`cat /proc/device-tree/serial-number | cut -c9-`
+-- 
+2.39.5
+
