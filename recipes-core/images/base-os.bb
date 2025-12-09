@@ -8,26 +8,41 @@ LIC_FILES_CHKSUM ?= "file://${COMMON_LICENSE_DIR}/GPL-2.0-only;md5=801f80980d171
 IMAGE_FSTYPES = "ext4 wic"
 IMAGE_OVERHEAD_FACTOR = "1.1"
 
-IMAGE_FEATURES:remove = "splash"
-IMAGE_FEATURES:remove = "package-management"
-#IMAGE_FEATURES:append = " x11-base"
+IMAGE_FEATURES:append = " package-management"
 IMAGE_FEATURES:append = " allow-root-login"
 IMAGE_FEATURES:append = " allow-empty-password"
 IMAGE_FEATURES:append = " empty-root-password"
-#IMAGE_FEATURES:append = " post-install-logging"
 IMAGE_FEATURES:append = " ssh-server-openssh"
 
-#IMAGE_INSTALL:append = " thcp"
-#IMAGE_INSTALL:append = " imgui"
+IMAGE_FEATURES:remove = "splash"
+#IMAGE_FEATURES:append = " post-install-logging"
+#IMAGE_FEATURES:append = " x11-base"
+
+IMAGE_INSTALL:append = " packagegroup-core-base-utils"
+IMAGE_INSTALL:append = " packagegroup-security-tpm2"
+IMAGE_INSTALL:append = " mbpoll"
 IMAGE_INSTALL:append = " os-release"
 IMAGE_INSTALL:append = " procps"
 IMAGE_INSTALL:append = " file"
-#IMAGE_INSTALL:append = " zile"
-IMAGE_INSTALL:append = " cpufrequtils"
-IMAGE_INSTALL:append = " mbpoll"
-# IMAGE_INSTALL:append = " openssl-bin"
+IMAGE_INSTALL:append = " mc"
+IMAGE_INSTALL:append = " u-boot-tools-mkimage"
+IMAGE_INSTALL:remove = "dhcpcd"
+IMAGE_INSTALL:remove = "avahi"
+IMAGE_INSTALL:remove = "ofono"
 
-inherit core-image features_check extrausers
+#IMAGE_INSTALL:append = " zile"
+#IMAGE_INSTALL:append = " cpufrequtils"
+# IMAGE_INSTALL:append = " openssl-bin"
+#IMAGE_INSTALL:append = " rpidistro-ffmpeg"
+#IMAGE_INSTALL:append =  " packagegroup-core-x11"
+#IMAGE_INSTALL:append =  " packagegroup-xfce-base"
+#IMAGE_INSTALL:append =  " mpv"
+
+#IMAGE_INSTALL:append = " thcp"
+#IMAGE_INSTALL:append = " imgui"
+
+#inherit core-image features_check extrausers
+inherit core-image extrausers
 
 # mkpasswd -m sha256crypt <your-password>
 # password: ppp

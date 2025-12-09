@@ -31,8 +31,10 @@ FILES:unipi-modbus-tools = "\
 "
 
 CONFFILES:unipi-modbus-tools += "${sysconfdir}/default/unipitcp"
-SYSTEMD_SERVICE:unipi-modbus-tools = "unipitcp.service"
-SYSTEMD_SERVICE:unipi-firmware-tools = "unipifwupdate.service"
+SYSTEMD_SERVICE:${PN} = "unipitcp.service"
+SYSTEMD_AUTO_ENABLE:${PN} = "enable"
+#SYSTEMD_SERVICE:unipi-firmware-tools = "unipifwupdate.service"
+
 INITSCRIPT_NAME:unipi-modbus-tools = "unipitcp"
 INITSCRIPT_PARAMS:unipi-modbus-tools = "start 50 2 3 4 5 ."
 
