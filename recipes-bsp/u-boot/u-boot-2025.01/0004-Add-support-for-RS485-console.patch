@@ -1,0 +1,121 @@
+From 5a619ff8d4bbaebe8789a9d1ff1c830737c5531c Mon Sep 17 00:00:00 2001
+From: Miroslav Ondra <ondra@faster.cz>
+Date: Sat, 14 Sep 2024 13:03:15 +0200
+Subject: [PATCH 4/6] Add support for RS485 console
+
+---
+ drivers/serial/serial_bcm283x_mu.c |  9 ++++++++-
+ drivers/serial/serial_pl01x.c      | 22 ++++++++++++++++++----
+ 2 files changed, 26 insertions(+), 5 deletions(-)
+
+diff --git a/drivers/serial/serial_bcm283x_mu.c b/drivers/serial/serial_bcm283x_mu.c
+index 7fa26244..ff7bea2f 100644
+--- a/drivers/serial/serial_bcm283x_mu.c
++++ b/drivers/serial/serial_bcm283x_mu.c
+@@ -50,6 +50,8 @@ struct bcm283x_mu_priv {
+ 	struct bcm283x_mu_regs *regs;
+ };
+ 
++__weak void rs485_bcmtx_op(u32 *cr2, u32 *sr2, int op) {}
++
+ static int bcm283x_mu_serial_getc(struct udevice *dev);
+ 
+ static int bcm283x_mu_serial_setbrg(struct udevice *dev, int baudrate)
+@@ -80,11 +82,13 @@ static int bcm283x_mu_serial_getc(struct udevice *dev)
+ 	struct bcm283x_mu_regs *regs = priv->regs;
+ 	u32 data;
+ 
++	rs485_bcmtx_op(&regs->mcr, &regs->lsr, 0);
+ 	/* Wait until there is data in the FIFO */
+ 	if (!(readl(&regs->lsr) & BCM283X_MU_LSR_RX_READY))
+ 		return -EAGAIN;
+ 
+ 	data = readl(&regs->io);
++	rs485_bcmtx_op(&regs->mcr, &regs->lsr, 2);
+ 
+ 	return (int)data;
+ }
+@@ -94,13 +98,15 @@ static int bcm283x_mu_serial_putc(struct udevice *dev, const char data)
+ 	struct bcm283x_mu_priv *priv = dev_get_priv(dev);
+ 	struct bcm283x_mu_regs *regs = priv->regs;
+ 
++	rs485_bcmtx_op(&regs->mcr, &regs->lsr, 1);
+ 	/* Wait until there is space in the FIFO */
+ 	if (!(readl(&regs->lsr) & BCM283X_MU_LSR_TX_EMPTY))
+ 		return -EAGAIN;
+ 
+ 	/* Send the character */
+ 	writel(data, &regs->io);
+-
++	if (data == '\n')
++		rs485_bcmtx_op(&regs->mcr, &regs->lsr, 0);
+ 	return 0;
+ }
+ 
+@@ -113,6 +119,7 @@ static int bcm283x_mu_serial_pending(struct udevice *dev, bool input)
+ 	lsr = readl(&regs->lsr);
+ 
+ 	if (input) {
++		rs485_bcmtx_op(&regs->mcr, &regs->lsr, 0);
+ 		schedule();
+ 		return (lsr & BCM283X_MU_LSR_RX_READY) ? 1 : 0;
+ 	} else {
+diff --git a/drivers/serial/serial_pl01x.c b/drivers/serial/serial_pl01x.c
+index e6bf0c29..433d8fd7 100644
+--- a/drivers/serial/serial_pl01x.c
++++ b/drivers/serial/serial_pl01x.c
+@@ -35,6 +35,9 @@ static struct pl01x_regs *base_regs __section(".data");
+ 
+ #endif
+ 
++__weak void rs485_tx_op(u32 *cr2, u32 *sr2, int op) {}
++
++
+ static int pl01x_putc(struct pl01x_regs *regs, char c)
+ {
+ 	/* Wait until there is space in the FIFO */
+@@ -336,16 +339,26 @@ int pl01x_serial_probe(struct udevice *dev)
+ 
+ int pl01x_serial_getc(struct udevice *dev)
+ {
++	int c;
+ 	struct pl01x_priv *priv = dev_get_priv(dev);
+ 
+-	return pl01x_getc(priv->regs);
++	rs485_tx_op(&priv->regs->pl011_cr, &priv->regs->fr, 0);
++
++	c = pl01x_getc(priv->regs);
++	rs485_tx_op(&priv->regs->pl011_cr, &priv->regs->fr, 2); // udelay(1000)
++	return c;
+ }
+ 
+ int pl01x_serial_putc(struct udevice *dev, const char ch)
+ {
+ 	struct pl01x_priv *priv = dev_get_priv(dev);
++	int ret;
+ 
+-	return pl01x_putc(priv->regs, ch);
++	rs485_tx_op(&priv->regs->pl011_cr, &priv->regs->fr, 1);
++	ret = pl01x_putc(priv->regs, ch);
++	if (ch == '\n')
++		rs485_tx_op(&priv->regs->pl011_cr, &priv->regs->fr, 0);
++	return ret;
+ }
+ 
+ int pl01x_serial_pending(struct udevice *dev, bool input)
+@@ -353,9 +366,10 @@ int pl01x_serial_pending(struct udevice *dev, bool input)
+ 	struct pl01x_priv *priv = dev_get_priv(dev);
+ 	unsigned int fr = readl(&priv->regs->fr);
+ 
+-	if (input)
++	if (input) {
++		rs485_tx_op(&priv->regs->pl011_cr, &priv->regs->fr, 0);
+ 		return pl01x_tstc(priv->regs);
+-	else
++	} else
+ 		return fr & UART_PL01x_FR_TXFE ? 0 : 1;
+ }
+ 
+-- 
+2.39.5
+

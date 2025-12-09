@@ -1,0 +1,1081 @@
+From 2523e59132435c3ce21f0bf8ec85ba6593386705 Mon Sep 17 00:00:00 2001
+From: Miroslav Ondra <ondra@faster.cz>
+Date: Mon, 17 Feb 2025 18:55:29 +0100
+Subject: [PATCH 6/6] Add Unipi board files
+
+---
+ board/raspberrypi/rpi/Makefile       |   1 +
+ board/raspberrypi/rpi/rpi.c          | 262 ++++++++++++++++++++++++++-
+ board/raspberrypi/rpi/rpi.env        |  18 +-
+ board/raspberrypi/rpi/uniee.h        | 226 +++++++++++++++++++++++
+ board/raspberrypi/rpi/uniee_values.h | 160 ++++++++++++++++
+ board/raspberrypi/rpi/unipi_eprom.c  | 157 ++++++++++++++++
+ board/raspberrypi/rpi/unipi_eprom.h  |  20 ++
+ configs/unipi_edge_defconfig         | 105 +++++++++++
+ 8 files changed, 947 insertions(+), 2 deletions(-)
+ create mode 100644 board/raspberrypi/rpi/uniee.h
+ create mode 100644 board/raspberrypi/rpi/uniee_values.h
+ create mode 100644 board/raspberrypi/rpi/unipi_eprom.c
+ create mode 100644 board/raspberrypi/rpi/unipi_eprom.h
+ create mode 100644 configs/unipi_edge_defconfig
+
+diff --git a/board/raspberrypi/rpi/Makefile b/board/raspberrypi/rpi/Makefile
+index bb1b7cc6..e6b3f3e8 100644
+--- a/board/raspberrypi/rpi/Makefile
++++ b/board/raspberrypi/rpi/Makefile
+@@ -6,3 +6,4 @@ obj-y	:= rpi.o
+ obj-y	+= lowlevel_init.o
+ 
+ obj-$(CONFIG_GENERATE_ACPI_TABLE) += dsdt_generated.o
++obj-$(CONFIG_I2C_EEPROM) += unipi_eprom.o
+diff --git a/board/raspberrypi/rpi/rpi.c b/board/raspberrypi/rpi/rpi.c
+index 18be244a..f20ab198 100644
+--- a/board/raspberrypi/rpi/rpi.c
++++ b/board/raspberrypi/rpi/rpi.c
+@@ -18,6 +18,7 @@
+ #include <asm/arch/sdhci.h>
+ #include <asm/global_data.h>
+ #include <dm/platform_data/serial_bcm283x_mu.h>
++#include <asm/io.h>
+ #ifdef CONFIG_ARM64
+ #include <asm/armv8/mmu.h>
+ #endif
+@@ -28,6 +29,16 @@
+ #include <acpi/acpigen.h>
+ #include <dm/lists.h>
+ #include <tables_csum.h>
++#include <rtc.h>
++#include <usb.h>
++#include <net.h>
++
++#include <i2c_eeprom.h>
++#include <linux/delay.h>
++ #define htobe16(x) cpu_to_be16(x)
++#include "uniee.h"
++#include "uniee_values.h"
++#include "unipi_eprom.h"
+ 
+ DECLARE_GLOBAL_DATA_PTR;
+ 
+@@ -371,6 +382,9 @@ static void set_usbethaddr(void)
+ 	if (!model->has_onboard_eth)
+ 		return;
+ 
++	if (env_get("ethaddr"))
++		return;
++
+ 	if (env_get("usbethaddr"))
+ 		return;
+ 
+@@ -436,7 +450,6 @@ int misc_init_r(void)
+ {
+ 	set_fdt_addr();
+ 	set_fdtfile();
+-	set_usbethaddr();
+ #ifdef CONFIG_ENV_VARS_UBOOT_RUNTIME_CONFIG
+ 	set_board_info();
+ #endif
+@@ -584,9 +597,218 @@ void  update_fdt_from_fw(void *fdt, void *fw_fdt)
+ 	copy_property(fdt, fw_fdt, "ethernet0/mdio@e14/ethernet-phy@1", "reg");
+ }
+ 
++#define UNIPI_EEPROM_SIZE UNIEE_MIN_EE_SIZE
++static u8 unipi_eprom[UNIPI_EEPROM_SIZE] __aligned(32);
++static int unipi_eprom_validity = -1;
++uniee_descriptor_area* uniee_descriptor;
++
++#ifdef CONFIG_I2C_EEPROM
++static int get_unipi_eeprom(void)
++{
++	int ret;
++	struct udevice *dev;
++
++	if (unipi_eprom_validity >= 0) {
++		return unipi_eprom_validity;
++	}
++	ret = uclass_first_device_err(UCLASS_I2C_EEPROM, &dev);
++	if (ret)
++		return ret;
++
++	ret = i2c_eeprom_read(dev, 0x0, unipi_eprom, UNIPI_EEPROM_SIZE);
++	if (ret) {
++		return ret;
++	}
++
++    /* check unipi mark */
++	uniee_descriptor = uniee_get_valid_descriptor(unipi_eprom, UNIPI_EEPROM_SIZE);
++	if (uniee_descriptor == NULL) {
++		unipi_eprom_validity = 1;
++		return -1;
++	}
++
++	uniee_fix_legacy_content(unipi_eprom, UNIPI_EEPROM_SIZE, uniee_descriptor);
++	unipi_eprom_validity = 0;
++	return 0;
++
++/*	if ((unipi_eprom[UNIPI_EEPROM_SLOT3_OFFSET] != 0xfa) || (unipi_eprom[UNIPI_EEPROM_SLOT3_OFFSET+1] != 0x55)) {
++		unipi_eprom_validity = 1;
++		return -1;
++	}
++	unipi_eprom_validity = 0;
++	return 0;
++*/
++}
++
++#define NEURON_BUTTON 12
++#define EDGE_BUTTON   25
++#define EDGE_RTS      17
++
++int rs485_enable = 0;
++int tx_active  = 0;
++
++/* compatible with AMBA PL011 driver from serial_pl01x.c */
++#define UART_PL011_CR_RTS               (1 << 11)
++#define UART_PL011_CR_RXE               (1 << 9)
++#define UART_PL01x_FR_TXFE              0x80
++#define UART_PL01x_FR_BUSY              0x08
++void rs485_tx_op(u32 *cr2, u32 *sr2, int op)
++{
++	if (rs485_enable != 1) return;
++	if (op == 0) {
++		if (tx_active) {
++			int i = 0;
++			while ((readl(sr2) & (UART_PL01x_FR_BUSY))) {
++				if (++i == 0x1000000) break;
++			}
++			gpio_set_value(EDGE_RTS, 0);
++			/* Enable RX, set alternatively UART driven RTS (inversed) */
++			writel(readl(cr2) | UART_PL011_CR_RTS | UART_PL011_CR_RXE, cr2);
++			tx_active = 0;
++		}
++	} else if (op == 1) {
++		if (!tx_active) {
++			/* Disable RX, clear alternatively UART driven RTS (inversed) */
++			writel(readl(cr2) & (~(UART_PL011_CR_RXE | UART_PL011_CR_RTS)), cr2);
++			gpio_set_value(EDGE_RTS, 1);
++			tx_active = 1;
++		}
++	} else if (op == 2)
++		udelay(1000);
++}
++
++/* compatible with BCM Mini UART  driver from serial_bcm283x_mu.c */
++#define BCM283X_MU_LSR_TX_IDLE		BIT(6)
++/* This actually means not full, but is named not empty in the docs */
++#define BCM283X_MU_LSR_TX_EMPTY		BIT(5)
++void rs485_bcmtx_op(u32 *cr2, u32 *sr2, int op)
++{
++	if (rs485_enable != 1) return;
++	if (op == 0) {
++		if (tx_active) {
++			int i = 0;
++			while (!(readl(sr2) & BCM283X_MU_LSR_TX_IDLE)) {
++				if (++i == 0x1000000) break;
++			}
++			gpio_set_value(EDGE_RTS, 0);
++			tx_active = 0;
++		}
++	} else if (op == 1) {
++		if (!tx_active) {
++			gpio_set_value(EDGE_RTS, 1);
++			tx_active = 1;
++		}
++	} else if (op == 2)
++		udelay(1000);
++}
++
++
++static int check_button_status(void)
++{
++	ulong button = 0;
++	ulong value = 0;
++	/* if not valid eprom  buttons are unusable */
++	if (get_unipi_eeprom() != 0)
++		return 0;
++
++	if (unipi_eeprom_get_uint_property(unipi_eprom, uniee_descriptor, UNIEE_FIELD_TYPE_BUTTON, &button) < 0) {
++		button = 0;
++	}
++	switch (button) {
++		//case UNIEE_FIELD_VALUE_BUTTON_IRIS:
++		//	/* check pin GPIO4_27 (UART3_RTS) - button + RTS on IRIS model, RTS only on Patron */
++		//	gpio_direction_input(RTS_BUTTON);
++		//	value = gpio_get_value(RTS_BUTTON);
++		//	break;
++		case UNIEE_FIELD_VALUE_BUTTON_NEURON:
++			gpio_request(NEURON_BUTTON, "neuron button");
++			gpio_direction_input(NEURON_BUTTON);
++			value = gpio_get_value(NEURON_BUTTON);
++			break;
++		case UNIEE_FIELD_VALUE_BUTTON_EDGE:
++			gpio_request(EDGE_BUTTON, "edge button");
++			gpio_direction_input(EDGE_BUTTON);
++			value = gpio_get_value(EDGE_BUTTON);
++			gpio_request(EDGE_RTS, "edge rts");
++			gpio_direction_output(EDGE_RTS, 0);
++			break;
++		default:
++			/* unknown button */
++			return 0;
++	}
++	printf("BUTTON type:%ld value: %ld\n", button, value);
++
++	if ((value == 0) && (button != 0)) {
++		env_set("bootdelay", "-2");
++		return 0;
++	};
++	return value;
++}
++
++static void load_mac_address(u8 index)
++{
++	u8 ethaddr[6];
++	if (get_unipi_eeprom() != 0)
++		return;
++
++	if (unipi_eeprom_get_bytes_property(unipi_eprom, uniee_descriptor,
++	    index?UNIEE_FIELD_TYPE_MAC1:UNIEE_FIELD_TYPE_MAC,
++	    ethaddr, 6) == 6) {
++		if (is_valid_ethaddr(ethaddr)) {
++			eth_env_set_enetaddr_by_index("eth", index,ethaddr);
++		}
++	}
++}
++
++#define MCP794XX_REG_CALIBRATION        0x08
++static void load_rtc_calibration(void)
++{
++	char calibration;
++	struct udevice *dev;
++	int ret;
++
++	if (get_unipi_eeprom() != 0)
++		return;
++	if (unipi_eeprom_get_bytes_property(unipi_eprom, uniee_descriptor, UNIEE_FIELD_TYPE_RTC, &calibration, 1) != 1)
++		return;
++	ret = uclass_get_device_by_name(UCLASS_RTC, "mcp7940x@6f", &dev);
++	if (ret != 0) {
++		ret = uclass_get_device_by_name(UCLASS_RTC, "rtc@6f", &dev);
++		if (ret != 0)
++			return;
++	}
++	rtc_write8(dev, MCP794XX_REG_CALIBRATION, calibration);
++}
++#endif
++
++int board_late_init(void)
++{
++#ifdef CONFIG_I2C_EEPROM
++    if (get_unipi_eeprom() == 0) {
++        if (check_button_status()) {
++            tx_active = 0;
++            rs485_enable = 1;
++            printf("Switch off BUTTON and press a KEY on console to break autoboot!\n");
++            env_set("bootdelay", "2");
++            env_set("bootcmd", "run boot_altboot;bootflow scan -lb");
++        }
++        load_mac_address(0);
++        load_mac_address(1);
++        load_rtc_calibration();
++    }
++#endif
++#ifdef CONFIG_ENV_VARS_UBOOT_RUNTIME_CONFIG
++    env_set("board_name", "UNIPI");
++    env_set("board_rev", "EDGE");
++#endif
++    set_usbethaddr();
++    return 0;
++}
++
+ int ft_board_setup(void *blob, struct bd_info *bd)
+ {
+ 	int node;
++	char tmpstr[20];
+ 
+ 	update_fdt_from_fw(blob, (void *)fw_dtb_pointer);
+ 
+@@ -602,9 +824,47 @@ int ft_board_setup(void *blob, struct bd_info *bd)
+ 			   EFI_RESERVED_MEMORY_TYPE);
+ #endif
+ 
++#ifdef CONFIG_I2C_EEPROM
++	if (get_unipi_eeprom() != 0)
++		return 0;
++
++	if (snprintf(tmpstr, sizeof(tmpstr)-1, "%u", unipi_eeprom_get_serial(uniee_descriptor)) >= 0) {
++		tmpstr[sizeof(tmpstr)-1]= '\0';
++		fdt_setprop(blob, 0, "unipi-serial", tmpstr, strlen(tmpstr) + 1);
++	}
++	if (snprintf(tmpstr, sizeof(tmpstr)-1, "%u", unipi_eeprom_get_sku(uniee_descriptor)) >= 0) {
++		tmpstr[sizeof(tmpstr)-1]= '\0';
++		fdt_setprop(blob, 0, "unipi-sku", tmpstr, strlen(tmpstr) + 1);
++	}
++	unipi_eeprom_get_model(uniee_descriptor, tmpstr, sizeof(tmpstr));
++	fdt_setprop(blob, 0, "unipi-model", tmpstr, strlen(tmpstr) + 1);
++#endif
+ 	return 0;
+ }
+ 
++void usb_hub_reset_devices(struct usb_hub_device *hub, int port)
++{
++	const char* env;
++	unsigned int delay = 2500;
++	u32 reg;
++	int ret;
++
++	if (hub && (hub->hub_depth == 0) && (port==1)) {
++		if (dev_has_ofnode(hub->pusb_dev->controller_dev)) {
++			ret = ofnode_read_u32(dev_ofnode(hub->pusb_dev->controller_dev), "reg", &reg);
++			if (ret /*|| (reg != 0x7e9c0000)*/)
++				return;
++		}
++		env = env_get("usb_hub1_delay");
++		if (env)
++			delay = simple_strtoul(env, NULL, 0);
++		printf("(Add usb_hub1_delay=%d ms) ", delay);
++		hub->query_delay += delay;
++		hub->connect_timeout += delay;
++	}
++	return;
++}
++
+ #if CONFIG_IS_ENABLED(GENERATE_ACPI_TABLE)
+ static bool is_rpi4(void)
+ {
+diff --git a/board/raspberrypi/rpi/rpi.env b/board/raspberrypi/rpi/rpi.env
+index 30228285..e51623df 100644
+--- a/board/raspberrypi/rpi/rpi.env
++++ b/board/raspberrypi/rpi/rpi.env
+@@ -2,7 +2,11 @@
+ 
+ /* environment for Raspberry Pi boards */
+ 
++#ifdef CONFIG_BOOTSTD
++boot_script_dhcp=boot.scr.uimg
++#else
+ dhcpuboot=usb start; dhcp u-boot.uimg; bootm
++#endif
+ 
+ /* Environment */
+ stdin=serial,usbkbd
+@@ -73,5 +77,17 @@ scriptaddr=0x02400000
+ pxefile_addr_r=0x02500000
+ fdt_addr_r=0x02600000
+ ramdisk_addr_r=0x02700000
++console=ttyAMA1
++kernel_comp_addr_r=0x0c00000
++kernel_comp_size=0x1a00000
++
++boot_targets=mmc0 mmc1 usb dhcp pxe
++bootmeths=script extlinux
++boot_altboot=
++    bootmeth order "altboot ${bootmeths}";
++    setenv boot_targets usb mmc0 mmc1 dhcp pxe;
++    setenv bootpretryperiod 3000;
+ 
+-boot_targets=mmc usb pxe dhcp
++altbootcmd=
++    bootmeth order "tryboot ${bootmeths}";
++    run bootcmd
+diff --git a/board/raspberrypi/rpi/uniee.h b/board/raspberrypi/rpi/uniee.h
+new file mode 100644
+index 00000000..da2b7dc0
+--- /dev/null
++++ b/board/raspberrypi/rpi/uniee.h
+@@ -0,0 +1,226 @@
++/*
++ * eestruct.h
++ *
++ *  Created on: Nov 12, 2021
++ *      Author: martyy
++ */
++
++#ifndef UNIEE_H_
++#define UNIEE_H_
++
++/*
++#if defined (CONFIG_MODULES) || defined (CONFIG_SYS_BOARD)
++ #include <linux/types.h>
++ #include <linux/string.h>
++ #include <asm/byteorder.h>
++ #define htobe16(x) cpu_to_be16(x)
++#else
++ #include <stdint.h>
++ #include <string.h>
++ #include <endian.h>
++#endif
++*/
++
++ #include "uniee_values.h"
++
++#define UNIEE_SIGNATURE htobe16(0xFA55)
++#define UNIEE_MIN_EE_SIZE 128
++#define UNIEE_MAX_EE_SIZE 256
++#define UNIEE_BANK_CNT 4
++#define UNIEE_BANK_SIZE 32
++#define UNIEE_INFO_AREA_SIZE (2*UNIEE_BANK_SIZE)
++#define UNIEE_MAX_SPECDATA_AREA_SIZE (UNIEE_MAX_EE_SIZE - UNIEE_INFO_AREA_SIZE)
++
++
++typedef struct __attribute__((__packed__)){
++	uint8_t major;
++	uint8_t minor;
++}version16_t;
++
++typedef struct __attribute__((__packed__)){
++	uint8_t bitmask;
++	uint8_t bitmask_inverted;
++}mervic_options_t;
++
++typedef union __attribute__((__packed__)){
++	struct {
++		uint8_t platform_family;
++		uint8_t platform_series;
++	} parsed;
++	uint16_t raw_id;
++}platform_id_t;
++
++typedef struct __attribute__((__packed__)){
++	uint8_t field_type;
++	uint8_t field_len;
++} specdata_header_t;
++
++typedef uint16_t board_model_t;
++
++/* Bank 0 - Board specific data*/
++typedef struct{
++	uint8_t dummy_data [32];
++}uniee_bank_0_t;
++
++/* Bank 1 - Board specific data */
++typedef struct {
++	uint8_t dummy_data [32];
++}uniee_bank_1_t;
++
++/* Bank 2 - Board info */
++typedef struct __attribute__((__packed__)){
++	uint32_t board_serial;
++	version16_t board_version;
++	board_model_t board_model;
++	specdata_header_t specdata_headers_table[12];
++}uniee_bank_2_t;
++
++typedef struct __attribute__((__packed__)){
++	uint32_t board_serial;
++	version16_t board_version;
++	int16_t rtc_calibration;
++	board_model_t board_model;
++	specdata_header_t specdata_headers_table[11];
++}uniee_bank_2_legacy_t;
++
++/* Bank 3 - Product info */
++typedef struct __attribute__((__packed__)){
++	uint16_t ee_signature;
++	version16_t product_version;
++	uint32_t product_serial;
++	mervic_options_t mervis_license;
++	uint8_t model_str [6];
++	uint32_t sku;
++	uint8_t dummy_data [8];
++	platform_id_t platform_id;
++	uint16_t checksum;
++}uniee_bank_3_t;
++
++
++///* 128 bytes eeprom space */
++//typedef struct {
++//	//uniee_bank_0_t bank_0;
++//	//uniee_bank_1_t bank_1;
++//	uint8_t board_specific_area[64];
++//	uniee_bank_2_t bank_2;
++//	uniee_bank_3_t bank_3;
++//}uniee_content_128_t;
++//
++
++///* 256 bytes eeprom space */
++//typedef struct {
++//	//uniee_bank_0_t bank_0;
++//	//uniee_bank_1_t bank_1;
++//	uint8_t board_specific_area[64+128];
++//	uniee_bank_2_t bank_2;
++//	uniee_bank_3_t bank_3;
++//}uniee_content_256_t;
++
++/* 256 bytes eeprom space */
++/*
++typedef struct {
++	//uniee_bank_0_t bank_0;
++	//uniee_bank_1_t bank_1;
++	//uint8_t board_specific_area[64+128];
++	uint8_t board_specific_area[];
++	uniee_bank_2_t bank_2;
++	uniee_bank_3_t bank_3;
++}uniee_content_t;
++*/
++
++typedef struct {
++	uniee_bank_2_t board_info;
++	uniee_bank_3_t product_info;
++}uniee_descriptor_area;
++
++
++/**
++ * Compute checksum from loaded EEPROM data and puts it to the right place in the buffer.
++ * This function does not write the checksum physically to the memory, @see uniee_write_bank()
++ * @return Checksum value
++ */
++uint16_t uniee_checksum_fill(void);
++
++/**
++ * Compute checksum from loaded EEPROM data and compare with the stored value.
++ * @return Zero if success, -1 otherwise
++ */
++int uniee_checksum_verify(void);
++
++/**
++ * Check if EEPROM is virgin
++ * @return
++ */
++int uniee_is_empty(void);
++
++int uniee_fix_content(void);
++
++
++static inline uniee_descriptor_area* uniee_get_valid_descriptor(uint8_t* buff, int size)
++{
++	uniee_descriptor_area *descriptor;
++	if (size < sizeof(uniee_descriptor_area) || buff==NULL){
++		// EEprom has to have minimal size for descriptor area
++		return NULL;
++	}
++
++	/* ToDo: check alignment or verify size leading banks */
++	descriptor = (uniee_descriptor_area*) (buff + (size - sizeof(uniee_descriptor_area)));
++	if (descriptor->product_info.ee_signature != UNIEE_SIGNATURE){
++		return NULL;
++	}
++	/* ToDo: softly check CRC */
++
++	return descriptor;
++}
++
++static inline void uniee_fix_legacy_content(uint8_t* buff, int size, uniee_descriptor_area *descriptor)
++{
++	/* Check and fix mervis option */
++	if ((~descriptor->product_info.mervis_license.bitmask) != descriptor->product_info.mervis_license.bitmask_inverted) {
++		descriptor->product_info.mervis_license.bitmask = 0;
++		descriptor->product_info.mervis_license.bitmask_inverted = 0xff;
++	}
++	/* Fix platform */
++	if (descriptor->product_info.platform_id.raw_id == 0xffff) {
++		char firstch = descriptor->product_info.model_str[0];
++		char proc_ch = descriptor->product_info.model_str[3];
++		if ((firstch=='S')||(firstch=='M')||(firstch=='L')) {
++			if (proc_ch=='3')
++				descriptor->product_info.platform_id.parsed.platform_family = UNIEE_PLATFORM_FAMILY_NEURON;
++			else if (proc_ch=='5')
++				descriptor->product_info.platform_id.parsed.platform_family = UNIEE_PLATFORM_FAMILY_AXON;
++			else if (proc_ch=='7')
++				descriptor->product_info.platform_id.parsed.platform_family = UNIEE_PLATFORM_FAMILY_PATRON;
++		} else if ((firstch=='G')) {
++			descriptor->product_info.platform_id.parsed.platform_family = UNIEE_PLATFORM_FAMILY_G1XX;
++		}
++	} else if (descriptor->product_info.platform_id.raw_id == 0x0000) {
++		/* probably Unipi 1 */
++		if ((descriptor->product_info.product_version.major==1)
++			&& ((descriptor->product_info.product_version.minor==1)
++			  ||(descriptor->product_info.product_version.minor==0x11))) {
++			descriptor->product_info.platform_id.parsed.platform_family = UNIEE_PLATFORM_FAMILY_UNIPI1;
++			/* Fix AI1 AI2 calibration for unipi 1 */
++			memcpy(buff, &descriptor->product_info.sku, 2*sizeof(float));
++			descriptor->product_info.sku = 0xffffffff;
++			descriptor->board_info.specdata_headers_table[0].field_type = UNIEE_FIELD_TYPE_AICAL;
++			descriptor->board_info.specdata_headers_table[0].field_len = sizeof(float);
++			descriptor->board_info.specdata_headers_table[1].field_type = UNIEE_FIELD_TYPE_AICAL;
++			descriptor->board_info.specdata_headers_table[1].field_len = sizeof(float);
++		}
++	}
++	/* Fix rtc_calibration on old G1xx and Iris proto-motherboards */
++	if ((descriptor->board_info.specdata_headers_table[0].field_type < 4) &&
++	    (descriptor->board_info.specdata_headers_table[0].field_type != 0) &&
++	    (descriptor->board_info.specdata_headers_table[0].field_len == 0)) {
++		board_model_t rtc_cal = descriptor->board_info.board_model;
++		descriptor->board_info.board_model = descriptor->board_info.specdata_headers_table[0].field_type;
++		descriptor->board_info.specdata_headers_table[0].field_type = UNIEE_FIELD_TYPE_RTC;
++		descriptor->board_info.specdata_headers_table[0].field_len = sizeof(rtc_cal);
++		memcpy(buff, &rtc_cal, sizeof(rtc_cal));
++	}
++}
++
++
++#endif /* UNIEE_H_ */
+diff --git a/board/raspberrypi/rpi/uniee_values.h b/board/raspberrypi/rpi/uniee_values.h
+new file mode 100644
+index 00000000..9676d914
+--- /dev/null
++++ b/board/raspberrypi/rpi/uniee_values.h
+@@ -0,0 +1,160 @@
++/******************************************************************
++ *
++ *  THIS FILE IS GENERATED FROM TEMPLATE. DON'T MODIFY IT
++ *
++ * uniee_values.h
++ *
++ *  Created on: Jan 14, 2022
++ *      Author: Miroslav Ondra <ondra@faster.cz>
++ *
++ */
++
++#ifndef UNIEE_VALUES_H_
++#define UNIEE_VALUES_H_
++
++/* uniee_bank_3_t.platform_id */
++ #define UNIEE_PLATFORM_FAMILY_UNIPI1   0x01
++ #define UNIEE_PLATFORM_FAMILY_G1XX   0x02
++ #define UNIEE_PLATFORM_FAMILY_NEURON   0x03
++ #define UNIEE_PLATFORM_FAMILY_AXON   0x05
++ #define UNIEE_PLATFORM_FAMILY_EDGE   0x06
++ #define UNIEE_PLATFORM_FAMILY_PATRON   0x07
++ #define UNIEE_PLATFORM_FAMILY_IRIS   0x0f
++ #define UNIEE_PLATFORM_FAMILY_OEM   0x10
++
++
++ #define UNIEE_PLATFORM_ID_UNIPI10   0x0001
++ #define UNIEE_PLATFORM_ID_UNIPI11   0x0101
++ #define UNIEE_PLATFORM_ID_UNIPI1L   0x1101
++ #define UNIEE_PLATFORM_ID_G100   0x0002
++ #define UNIEE_PLATFORM_ID_G110   0x0102
++ #define UNIEE_PLATFORM_ID_IRISX1   0x010f
++ #define UNIEE_PLATFORM_ID_IRISX2   0x020f
++ #define UNIEE_PLATFORM_ID_IRISX5   0x030f
++ #define UNIEE_PLATFORM_ID_IRISX7   0x040f
++ #define UNIEE_PLATFORM_ID_IRISX21   0x050f
++ #define UNIEE_PLATFORM_ID_IRISX71   0x060f
++ #define UNIEE_PLATFORM_ID_IRIS_CARD   0xca0f
++ #define UNIEE_PLATFORM_ID_S103   0x0103
++ #define UNIEE_PLATFORM_ID_M103   0x0203
++ #define UNIEE_PLATFORM_ID_M203   0x0303
++ #define UNIEE_PLATFORM_ID_M303   0x0403
++ #define UNIEE_PLATFORM_ID_M523   0x0503
++ #define UNIEE_PLATFORM_ID_L203   0x0603
++ #define UNIEE_PLATFORM_ID_L403   0x0703
++ #define UNIEE_PLATFORM_ID_L523   0x0803
++ #define UNIEE_PLATFORM_ID_L533   0x0903
++ #define UNIEE_PLATFORM_ID_S103_G   0x0a03
++ #define UNIEE_PLATFORM_ID_M403   0x0b03
++ #define UNIEE_PLATFORM_ID_M503   0x0c03
++ #define UNIEE_PLATFORM_ID_M603   0x0d03
++ #define UNIEE_PLATFORM_ID_L303   0x0e03
++ #define UNIEE_PLATFORM_ID_L503   0x0f03
++ #define UNIEE_PLATFORM_ID_L513   0x1003
++ #define UNIEE_PLATFORM_ID_S103_E   0x1103
++ #define UNIEE_PLATFORM_ID_S103_I   0x1203
++ #define UNIEE_PLATFORM_ID_S107   0x0107
++ #define UNIEE_PLATFORM_ID_S207   0x0207
++ #define UNIEE_PLATFORM_ID_M207   0x0307
++ #define UNIEE_PLATFORM_ID_M527   0x0407
++ #define UNIEE_PLATFORM_ID_L207   0x0507
++ #define UNIEE_PLATFORM_ID_L527   0x0607
++ #define UNIEE_PLATFORM_ID_S117   0x0707
++ #define UNIEE_PLATFORM_ID_M267   0x0807
++ #define UNIEE_PLATFORM_ID_M567   0x0907
++ #define UNIEE_PLATFORM_ID_S167   0x0a07
++ #define UNIEE_PLATFORM_ID_S227   0x0b07
++ #define UNIEE_PLATFORM_ID_E10100   0x0206
++ #define UNIEE_PLATFORM_ID_AKUZU1   0x0c07
++ #define UNIEE_PLATFORM_ID_ACHE1   0x0110
++ #define UNIEE_PLATFORM_ID_ACHE2   0x0210
++ #define UNIEE_PLATFORM_ID_AKUSO1   0x0106
++
++
++/* uniee_bank_2_t.board_model */
++ #define UNIEE_BOARD_MODEL_G_1001_1	1
++ #define UNIEE_BOARD_MODEL_G_1002_1	2
++ #define UNIEE_BOARD_MODEL_IM_SPR485SD_1	3
++ #define UNIEE_BOARD_MODEL_B_1000_1	4
++ #define UNIEE_BOARD_MODEL_B_1000_2	5
++ #define UNIEE_BOARD_MODEL_B_1000_3	6
++ #define UNIEE_BOARD_MODEL_N_1000_1	7
++ #define UNIEE_BOARD_MODEL_N_1001_1	8
++ #define UNIEE_BOARD_MODEL_N_1002_1	9
++ #define UNIEE_BOARD_MODEL_EMO_R8	24
++ #define UNIEE_BOARD_MODEL_IC_DIS4_0	100
++ #define UNIEE_BOARD_MODEL_IC_LORANODE_1	101
++ #define UNIEE_BOARD_MODEL_IC_LIGHT1P80_1	103
++ #define UNIEE_BOARD_MODEL_IC_AIF2AO1_1	104
++ #define UNIEE_BOARD_MODEL_IC_DIS2DO2_1	105
++ #define UNIEE_BOARD_MODEL_IC_R485R485422_1	106
++ #define UNIEE_BOARD_MODEL_IC_AOU4_1	107
++ #define UNIEE_BOARD_MODEL_ID_AIUC8_1	108
++ #define UNIEE_BOARD_MODEL_ID_AIRTD8_1	109
++ #define UNIEE_BOARD_MODEL_ID_DIS8_1	110
++ #define UNIEE_BOARD_MODEL_ID_DO8_1	111
++ #define UNIEE_BOARD_MODEL_IC_CANFD_1	112
++ #define UNIEE_BOARD_MODEL_IC_ETH100_1	113
++ #define UNIEE_BOARD_MODEL_IC_R232_1	114
++ #define UNIEE_BOARD_MODEL_ID_SATA_1	115
++ #define UNIEE_BOARD_MODEL_ID_LTE_1	116
++ #define UNIEE_BOARD_MODEL_IC_GPS_1	117
++ #define UNIEE_BOARD_MODEL_IC_ACCGYRO_1	118
++ #define UNIEE_BOARD_MODEL_IC_DI1RO2_1	119
++ #define UNIEE_BOARD_MODEL_ID_DIS16_1	120
++ #define UNIEE_BOARD_MODEL_ID_DO16_1	121
++ #define UNIEE_BOARD_MODEL_ID_R232X4_1	122
++ #define UNIEE_BOARD_MODEL_ID_AIUC8_2	123
++ #define UNIEE_BOARD_MODEL_IC_DIS4_1	124
++ #define UNIEE_BOARD_MODEL_IC_AI2AO1_1	125
++ #define UNIEE_BOARD_MODEL_ID_EM3F_1	126
++ #define UNIEE_BOARD_MODEL_IC_LORANODE_2	127
++ #define UNIEE_BOARD_MODEL_IC_ZIGBEE_1	128
++ #define UNIEE_BOARD_MODEL_UDELAB01	200
++ #define UNIEE_BOARD_MODEL_IC_IQRF_1	1000
++ #define UNIEE_BOARD_MODEL_ID_ETH100DI1WIFI_1	1001
++ #define UNIEE_BOARD_MODEL_CD_MACHZLM_1	2000
++ #define UNIEE_BOARD_MODEL_CD_ACDISP_1	2001
++ #define UNIEE_BOARD_MODEL_CD_ASUPCM4_1	2002
++ #define UNIEE_BOARD_MODEL_CD_ASUPZULU_1	2003
++ #define UNIEE_BOARD_MODEL_CD_ACPLC_4	2004
++ #define UNIEE_BOARD_MODEL_CD_ACDISP_2	2005
++
++
++/* specdata_header_t.field_type */
++ #define UNIEE_FIELD_TYPE_BUTTON	4
++ #define UNIEE_FIELD_TYPE_RTC	5
++ #define UNIEE_FIELD_TYPE_MAC	6
++ #define UNIEE_FIELD_TYPE_AICAL	7
++ #define UNIEE_FIELD_TYPE_MAC1	8
++ #define UNIEE_FIELD_TYPE_MODEM	9
++
++
++/* values of fields stored in uniee_bank_1_t.dummy_data */
++
++ #define UNIEE_FIELD_VALUE_BUTTON_PATRON	0
++ #define UNIEE_FIELD_VALUE_BUTTON_IRIS	1
++ #define UNIEE_FIELD_VALUE_BUTTON_NEURON	2
++ #define UNIEE_FIELD_VALUE_BUTTON_EDGE	3
++
++
++
++
++struct uniee_map {
++  int index;
++  const char *name;
++};
++
++/* specdata_header_t.field_type */
++#define UNIEE_FIELD_TYPE_MAP {\
++ { 4,"BUTTON" },\
++ { 5,"RTC" },\
++ { 6,"MAC" },\
++ { 7,"AICAL" },\
++ { 8,"MAC1" },\
++ { 9,"MODEM" },\
++}
++
++#define DIM(x) (sizeof(x)/sizeof(*(x)))
++
++#endif
+\ No newline at end of file
+diff --git a/board/raspberrypi/rpi/unipi_eprom.c b/board/raspberrypi/rpi/unipi_eprom.c
+new file mode 100644
+index 00000000..24322aa0
+--- /dev/null
++++ b/board/raspberrypi/rpi/unipi_eprom.c
+@@ -0,0 +1,157 @@
++/*
++ *
++ * Copyright (c) 2021  Faster CZ, ondra@faster.cz
++ *
++ * SPDX-License-Identifier: LGPL-2.1+
++ *
++ */
++
++#include <miiphy.h>
++#include <netdev.h>
++//#include <asm/mach-imx/iomux-v3.h>
++#include <asm-generic/gpio.h>
++//#include <asm/arch/imx8mm_pins.h>
++//#include <asm/arch/clock.h>
++//#include <asm/arch/sys_proto.h>
++//#include <asm/mach-imx/gpio.h>
++//#include <asm/mach-imx/mxc_i2c.h>
++#include <i2c.h>
++#include <asm/io.h>
++#include <usb.h>
++#include <i2c_eeprom.h>
++#include <linux/delay.h>
++
++ #define htobe16(x) cpu_to_be16(x)
++
++#include "uniee.h"
++#include "uniee_values.h"
++#include "unipi_eprom.h"
++
++
++
++
++/*
++static void slotcp(u8* slot, int size, void* dest)
++{
++	const char* undef = "\xff\xff\xff\xff\xff\xff\xff\xff";
++	if (memcmp(undef, slot, size)!=0)
++		memcpy(dest, slot, size);
++}
++*/
++
++static void slotstr(u8* slot, int size, char* dest)
++{
++	int i;
++	char ch;
++	for (i=0; i<size; i++) {
++		dest[i] = ch = slot[i];
++		if (ch == 0xff || ch == '\0') {
++			dest[i] = '\0';
++			break;
++		}
++	}
++}
++
++
++/*
++	Find property in memory block from Unipi Eprom
++	returns:
++			- pointer to data and length in len
++			- NULL if property not found or any error in structure
++*/
++#define specdata_count 12
++#define specdata_size  (2*UNIEE_BANK_SIZE)
++
++u8* unipi_eeprom_find_property(u8 *eprom, uniee_descriptor_area* descriptor, int property_type, int* len)
++{
++	int cur_type, i;
++	int dataindex = 0;
++
++	for (i=0; i < specdata_count; i++) {
++		cur_type = descriptor->board_info.specdata_headers_table[i].field_type |
++                   (((int)(descriptor->board_info.specdata_headers_table[i].field_len & (~0x3f)))<<2);
++		*len = descriptor->board_info.specdata_headers_table[i].field_len & (0x3f);
++		if ((dataindex + *len) >= specdata_size)
++			return NULL;
++		if (cur_type == property_type) {
++			return eprom + dataindex;
++		}
++		dataindex += *len;
++	}
++	return NULL;
++}
++
++/*
++	Find unsigned integer property in memory block from Unipi Eprom
++	returns:
++			- original length of property data (0-8) and uint value
++			- negative number if error
++*/
++int unipi_eeprom_get_uint_property(u8 *eprom, uniee_descriptor_area* descriptor, int property_type, unsigned long *value)
++{
++	int len;
++	u8* ptr = unipi_eeprom_find_property(eprom, descriptor, property_type, &len);
++	if (ptr == NULL) return -1;
++	if (len > sizeof(*value)) return -1;
++	*value = 0;
++	memcpy(value, ptr, len);
++	return len;
++}
++
++/*
++	Find bytes property in memory block from Unipi Eprom
++	returns:
++			- original length of property data
++			- negative number if error
++*/
++int unipi_eeprom_get_bytes_property(u8 *eprom, uniee_descriptor_area* descriptor, int property_type, u8* bytes, int maxlen)
++{
++	int len;
++	u8 *ptr = unipi_eeprom_find_property(eprom, descriptor, property_type, &len);
++
++	if (len <= 0) return len;
++	memcpy(bytes, ptr, min(len,maxlen));
++	return len;
++}
++/*
++	Find string property in memory block from Unipi Eprom
++	returns:
++			- original length of property data and null terminated str
++			- negative number if error
++*/
++int unipi_eeprom_get_str_property(u8 *eprom, uniee_descriptor_area* descriptor, int property_type, char* str, int maxlen)
++{
++	int len;
++	u8 *ptr = unipi_eeprom_find_property(eprom, descriptor, property_type, &len);
++
++	if (len < 0) return len;
++	if (len == 0) {
++		str[0] = '\0';
++	} else {
++		slotstr(ptr, min(len,maxlen-1), str);
++		str[min(len,maxlen-1)] = '\0';
++	}
++	return len;
++}
++
++
++u32 unipi_eeprom_get_serial(uniee_descriptor_area* descriptor)
++{
++	u32 serial = descriptor->product_info.product_serial;
++	if (serial == 0xffffffff) serial = 0;
++	return serial;
++}
++
++u32 unipi_eeprom_get_sku(uniee_descriptor_area* descriptor)
++{
++	u32 sku = descriptor->product_info.sku;
++	if (sku == 0xffffffff) sku = 0;
++	return sku;
++}
++
++void unipi_eeprom_get_model(uniee_descriptor_area* descriptor, char* str, int maxlen)
++{
++	int len = min((int) sizeof(descriptor->product_info.model_str), maxlen-1);
++	slotstr(descriptor->product_info.model_str, len, str);
++	str[len]= '\0';
++}
+diff --git a/board/raspberrypi/rpi/unipi_eprom.h b/board/raspberrypi/rpi/unipi_eprom.h
+new file mode 100644
+index 00000000..21a7ba98
+--- /dev/null
++++ b/board/raspberrypi/rpi/unipi_eprom.h
+@@ -0,0 +1,20 @@
++/*
++ *
++ * Copyright (c) 2021  Faster CZ, ondra@faster.cz
++ *
++ * SPDX-License-Identifier: LGPL-2.1+
++ *
++ */
++
++#ifndef UNIPI_EPROM_H_
++#define UNIPI_EPROM_H_
++
++#include "uniee.h"
++
++int unipi_eeprom_get_uint_property(u8 *eprom, uniee_descriptor_area* descriptor, int property_type, unsigned long *value);
++int unipi_eeprom_get_bytes_property(u8 *eprom, uniee_descriptor_area* descriptor, int property_type, u8* bytes, int maxlen);
++u32 unipi_eeprom_get_serial(uniee_descriptor_area* descriptor);
++u32 unipi_eeprom_get_sku(uniee_descriptor_area* descriptor);
++void unipi_eeprom_get_model(uniee_descriptor_area* descriptor, char* str, int maxlen);
++
++#endif /* UNIPI_EPROM_H_*/
+diff --git a/configs/unipi_edge_defconfig b/configs/unipi_edge_defconfig
+new file mode 100644
+index 00000000..43e796f1
+--- /dev/null
++++ b/configs/unipi_edge_defconfig
+@@ -0,0 +1,105 @@
++CONFIG_ARM=y
++CONFIG_ARCH_BCM283X=y
++CONFIG_TEXT_BASE=0x00080000
++CONFIG_TARGET_RPI_ARM64=y
++CONFIG_HAS_CUSTOM_SYS_INIT_SP_ADDR=y
++CONFIG_CUSTOM_SYS_INIT_SP_ADDR=0x7fffe30
++CONFIG_ENV_SIZE=0x4000
++CONFIG_DEFAULT_DEVICE_TREE="bcm2711-rpi-4-b"
++CONFIG_OF_LIBFDT_OVERLAY=y
++CONFIG_DM_RESET=y
++CONFIG_BOOTCOUNT_BOOTLIMIT=1
++CONFIG_SYS_LOAD_ADDR=0x1000000
++CONFIG_PCI=y
++CONFIG_ENV_VARS_UBOOT_CONFIG=y
++CONFIG_BOOTSTD_FULL=y
++# CONFIG_BOOTSTD_DEFAULTS is not set
++# CONFIG_BOOTMETH_EFILOADER is not set
++# CONFIG_BOOTMETH_EFI_BOOTMGR is not set
++CONFIG_SUPPORT_RAW_INITRD=y
++CONFIG_BOOTDELAY=1
++CONFIG_AUTOBOOT_KEYED=y
++CONFIG_AUTOBOOT_PROMPT="Press <SPACE> or <ENTER> to stop autoboot in %d seconds\n"
++CONFIG_AUTOBOOT_DELAY_STR=" "
++CONFIG_AUTOBOOT_STOP_STR="\r"
++CONFIG_OF_BOARD_SETUP=y
++CONFIG_FDT_SIMPLEFB=y
++CONFIG_USE_BOOTCOMMAND=y
++CONFIG_BOOTCOMMAND="bootflow scan -b"
++CONFIG_USE_PREBOOT=y
++CONFIG_PREBOOT="pci enum"
++CONFIG_SYS_PBSIZE=1049
++# CONFIG_CONSOLE_MUX is not set
++CONFIG_SYS_STDIO_DEREGISTER=y
++# CONFIG_DISPLAY_CPUINFO is not set
++# CONFIG_DISPLAY_BOARDINFO is not set
++CONFIG_BOARD_LATE_INIT=y
++CONFIG_MISC_INIT_R=y
++CONFIG_SYS_PROMPT="U-Boot> "
++# CONFIG_CMD_BOOTEFI is not set
++CONFIG_CMD_GPIO=y
++CONFIG_CMD_MMC=y
++CONFIG_CMD_PART=y
++CONFIG_CMD_PCI=y
++CONFIG_CMD_USB=y
++CONFIG_CMD_DHCP=y
++CONFIG_BOOTP_MAY_FAIL=y
++CONFIG_CMD_NFS=y
++CONFIG_CMD_BOOTCOUNT=y
++# CONFIG_CMD_CLS is not set
++# CONFIG_CMD_EFICONFIG is not set
++CONFIG_CMD_SYSBOOT=y
++CONFIG_CMD_TPM=y
++CONFIG_CMD_EXT2=y
++CONFIG_CMD_EXT4=y
++CONFIG_CMD_FAT=y
++CONFIG_CMD_FS_GENERIC=y
++CONFIG_CMD_FS_UUID=y
++CONFIG_ISO_PARTITION=y
++CONFIG_EFI_PARTITION=y
++# CONFIG_ENV_IS_IN_FAT is not set
++CONFIG_ENV_VARS_UBOOT_RUNTIME_CONFIG=y
++CONFIG_DM_DMA=y
++CONFIG_BOOTCOUNT_LIMIT=y
++CONFIG_DM_BOOTCOUNT=y
++CONFIG_DM_BOOTCOUNT_RTC=y
++CONFIG_BCM2835_GPIO=y
++CONFIG_DM_I2C=y
++CONFIG_SYS_I2C_BCM2835=y
++CONFIG_DM_KEYBOARD=y
++CONFIG_MISC=y
++CONFIG_I2C_EEPROM=y
++CONFIG_MMC_SDHCI=y
++CONFIG_MMC_SDHCI_SDMA=y
++CONFIG_MMC_SDHCI_BCM2835=y
++CONFIG_PHY_BROADCOM=y
++CONFIG_PHY_ETHERNET_ID=y
++CONFIG_BCMGENET=y
++CONFIG_PCI_BRCMSTB=y
++CONFIG_PINCTRL=y
++# CONFIG_PINCTRL_GENERIC is not set
++CONFIG_RNG_IPROC200=y
++CONFIG_DM_RTC=y
++CONFIG_RTC_DS1307=y
++# CONFIG_REQUIRE_SERIAL_CONSOLE is not set
++CONFIG_SPI=y
++CONFIG_DM_SPI=y
++CONFIG_SOFT_SPI=y
++CONFIG_SYSINFO=y
++CONFIG_SYSINFO_SMBIOS=y
++# CONFIG_TPM_V1 is not set
++CONFIG_TPM2_TIS_SPI=y
++CONFIG_USB=y
++CONFIG_USB_XHCI_HCD=y
++CONFIG_USB_XHCI_PCI=y
++CONFIG_USB_XHCI_BRCM=y
++CONFIG_USB_DWC2=y
++CONFIG_USB_STORAGE=y
++CONFIG_USB_HOST_ETHER=y
++CONFIG_VIDEO=y
++# CONFIG_VIDEO_LOGO is not set
++# CONFIG_PANEL is not set
++CONFIG_VIDEO_BCM2835=y
++CONFIG_PHYS_TO_BUS=y
++CONFIG_FS_BTRFS=y
++CONFIG_TPM=y
+-- 
+2.39.5
+

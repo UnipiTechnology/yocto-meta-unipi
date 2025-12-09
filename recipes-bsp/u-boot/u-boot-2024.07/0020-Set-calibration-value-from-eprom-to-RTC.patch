@@ -1,0 +1,76 @@
+From 975c4435b65d79ae575729f9918651b70c7ab1ec Mon Sep 17 00:00:00 2001
+From: Miroslav Ondra <ondra@faster.cz>
+Date: Sat, 21 Dec 2024 17:12:37 +0100
+Subject: [PATCH] Set calibration value from eprom to RTC
+
+---
+ board/raspberrypi/rpi/rpi.c | 40 +++++++++++++++++++++++++++++--------
+ 1 file changed, 32 insertions(+), 8 deletions(-)
+
+diff --git a/board/raspberrypi/rpi/rpi.c b/board/raspberrypi/rpi/rpi.c
+index 8a2a731e..e52e28e4 100644
+--- a/board/raspberrypi/rpi/rpi.c
++++ b/board/raspberrypi/rpi/rpi.c
+@@ -25,6 +25,7 @@
+ #endif
+ #include <watchdog.h>
+ #include <dm/pinctrl.h>
++#include <rtc.h>
+ #include <usb.h>
+ #include <net.h>
+ 
+@@ -743,20 +744,43 @@ static void load_mac_address(u8 index)
+ 		}
+ 	}
+ }
++
++#define MCP794XX_REG_CALIBRATION        0x08
++static void load_rtc_calibration(void)
++{
++	char calibration;
++	struct udevice *dev;
++	int ret;
++
++	if (get_unipi_eeprom() != 0)
++		return;
++	if (unipi_eeprom_get_bytes_property(unipi_eprom, uniee_descriptor, UNIEE_FIELD_TYPE_RTC, &calibration, 1) != 1)
++		return;
++	ret = uclass_get_device_by_name(UCLASS_RTC, "mcp7940x@6f", &dev);
++	if (ret != 0) {
++		ret = uclass_get_device_by_name(UCLASS_RTC, "rtc@6f", &dev);
++		if (ret != 0)
++			return;
++	}
++	rtc_write8(dev, MCP794XX_REG_CALIBRATION, calibration);
++}
+ #endif
+ 
+ int board_late_init(void)
+ {
+ #ifdef CONFIG_I2C_EEPROM
+-    if (check_button_status()) {
+-        tx_active = 0;
+-        rs485_enable = 1;
+-        printf("Switch off BUTTON and press a KEY on console to break autoboot!\n");
+-        env_set("bootdelay", "2");
+-        env_set("bootcmd", "run boot_altboot;bootflow scan -lb");
++    if (get_unipi_eeprom() == 0) {
++        if (check_button_status()) {
++            tx_active = 0;
++            rs485_enable = 1;
++            printf("Switch off BUTTON and press a KEY on console to break autoboot!\n");
++            env_set("bootdelay", "2");
++            env_set("bootcmd", "run boot_altboot;bootflow scan -lb");
++        }
++        load_mac_address(0);
++        load_mac_address(1);
++        load_rtc_calibration();
+     }
+-    load_mac_address(0);
+-    load_mac_address(1);
+ #endif
+ #ifdef CONFIG_ENV_VARS_UBOOT_RUNTIME_CONFIG
+     env_set("board_name", "UNIPI");
+-- 
+2.39.5
+

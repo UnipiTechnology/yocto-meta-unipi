@@ -1,0 +1,58 @@
+From f675fa71fb0cb1bb91465d79e183aabfa7d9341c Mon Sep 17 00:00:00 2001
+From: Miroslav Ondra <ondra@faster.cz>
+Date: Mon, 16 Sep 2024 11:13:46 +0200
+Subject: [PATCH 12/14] Prepare board files for bootstd system
+
+---
+ board/raspberrypi/rpi/rpi.c   |  2 +-
+ board/raspberrypi/rpi/rpi.env | 15 +++++++++++++--
+ 2 files changed, 14 insertions(+), 3 deletions(-)
+
+diff --git a/board/raspberrypi/rpi/rpi.c b/board/raspberrypi/rpi/rpi.c
+index c7aca79b..fe06dc14 100644
+--- a/board/raspberrypi/rpi/rpi.c
++++ b/board/raspberrypi/rpi/rpi.c
+@@ -734,7 +734,7 @@ int board_late_init(void)
+         rs485_enable = 1;
+         printf("Switch off BUTTON and press a KEY on console to break autoboot!\n");
+         env_set("bootdelay", "2");
+-        env_set("bootcmd", "run boot_altboot;run distro_bootcmd");
++        env_set("bootcmd", "run boot_altboot;bootflow scan -lb");
+     }
+ #endif
+ #ifdef CONFIG_ENV_VARS_UBOOT_RUNTIME_CONFIG
+diff --git a/board/raspberrypi/rpi/rpi.env b/board/raspberrypi/rpi/rpi.env
+index 2f2511a7..bbde78de 100644
+--- a/board/raspberrypi/rpi/rpi.env
++++ b/board/raspberrypi/rpi/rpi.env
+@@ -2,7 +2,11 @@
+ 
+ /* environment for Raspberry Pi boards */
+ 
++#ifdef CONFIG_BOOTSTD
++boot_script_dhcp=boot.scr.uimg
++#else
+ dhcpuboot=usb start; dhcp u-boot.uimg; bootm
++#endif
+ 
+ /* Environment */
+ stdin=serial,usbkbd
+@@ -77,6 +81,13 @@ console=ttyAMA0"
+ kernel_comp_addr_r=0x0c00000
+ kernel_comp_size=0x1a00000
+ 
+-boot_targets=mmc usb dhcp pxe
++boot_targets=mmc0 mmc1 usb dhcp pxe
++bootmeths=script extlinux
++boot_altboot=
++    bootmeth order "altboot ${bootmeths}";
++    setenv boot_targets usb mmc0 mmc1 dhcp pxe;
++    setenv bootpretryperiod 3000;
+ 
+-boot_altboot=setenv boot_prefixes /altboot/ /boot/altboot/ ${boot_prefixes}; usb start; run bootcmd_usb0; setenv bootpretryperiod 3000
++altbootcmd=
++    bootmeth order "tryboot ${bootmeths}";
++    run bootcmd
+-- 
+2.39.2
+

@@ -1,0 +1,21 @@
+From 8e33d914dc4a93efe3a66bdd8a4505a111150680 Mon Sep 17 00:00:00 2001
+From: Miroslav Ondra <ondra@faster.cz>
+Date: Thu, 13 Feb 2025 15:27:40 +0100
+Subject: [PATCH] CM40 43455 firmware to standard variant
+
+---
+ .../brcm/brcmfmac43455-sdio.raspberrypi,4-compute-module.bin    | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/debian/config/brcm80211/brcm/brcmfmac43455-sdio.raspberrypi,4-compute-module.bin b/debian/config/brcm80211/brcm/brcmfmac43455-sdio.raspberrypi,4-compute-module.bin
+index 9c39208..b914838 120000
+--- a/debian/config/brcm80211/brcm/brcmfmac43455-sdio.raspberrypi,4-compute-module.bin
++++ b/debian/config/brcm80211/brcm/brcmfmac43455-sdio.raspberrypi,4-compute-module.bin
+@@ -1 +1 @@
+-../cypress/cyfmac43455-sdio.bin
+\ No newline at end of file
++../cypress/cyfmac43455-sdio-standard.bin
+\ No newline at end of file
+-- 
+2.39.5
+

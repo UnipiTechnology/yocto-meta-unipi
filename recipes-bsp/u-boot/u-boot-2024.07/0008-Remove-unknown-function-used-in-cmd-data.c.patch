@@ -1,0 +1,25 @@
+From 31c39e259c17473178e4146c4e2fb6772925a50d Mon Sep 17 00:00:00 2001
+From: Miroslav Ondra <ondra@faster.cz>
+Date: Sat, 14 Sep 2024 12:44:03 +0200
+Subject: [PATCH 08/14] Remove unknown function used in cmd/data.c
+
+---
+ cmd/date.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/cmd/date.c b/cmd/date.c
+index d7154e92..af99af71 100644
+--- a/cmd/date.c
++++ b/cmd/date.c
+@@ -112,7 +112,7 @@ static int do_date(struct cmd_tbl *cmdtp, int flag, int argc,
+ 			printf ("Date: %4d-%02d-%02d (%sday)    Time: %2d:%02d:%02d  Unixtime: %lld\n",
+ 				tm.tm_year, tm.tm_mon, tm.tm_mday,
+ 				(tm.tm_wday<0 || tm.tm_wday>6) ?
+-					"unknown " : RELOC(weekdays[tm.tm_wday]),
++					"unknown " : weekdays[tm.tm_wday],
+ 				tm.tm_hour, tm.tm_min, tm.tm_sec, 
+ 				rtc_mktime(&tm));
+ 		} else {
+-- 
+2.39.2
+

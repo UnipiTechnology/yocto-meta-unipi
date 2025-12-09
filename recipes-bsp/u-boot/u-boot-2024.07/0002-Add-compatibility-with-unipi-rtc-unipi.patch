@@ -1,0 +1,24 @@
+From c442e284014c24b45d8993fae2a67041fa0271c1 Mon Sep 17 00:00:00 2001
+From: Miroslav Ondra <ondra@faster.cz>
+Date: Tue, 10 Sep 2024 21:20:59 +0200
+Subject: [PATCH 02/14] Add compatibility with unipi,rtc-unipi
+
+---
+ drivers/rtc/ds1307.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/drivers/rtc/ds1307.c b/drivers/rtc/ds1307.c
+index 0e9d3d24..1d4e210f 100644
+--- a/drivers/rtc/ds1307.c
++++ b/drivers/rtc/ds1307.c
+@@ -361,6 +361,7 @@ static const struct udevice_id ds1307_rtc_ids[] = {
+ 	{ .compatible = "microchip,mcp7940x", .data = mcp794xx },
+ 	{ .compatible = "microchip,mcp7941x", .data = mcp794xx },
+ 	{ .compatible = "st,m41t11", .data = m41t11 },
++	{ .compatible = "unipi,rtc-unipi", .data = mcp794xx },
+ 	{ }
+ };
+ 
+-- 
+2.39.2
+

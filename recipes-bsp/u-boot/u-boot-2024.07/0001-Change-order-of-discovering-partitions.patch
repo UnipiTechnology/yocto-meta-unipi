@@ -1,0 +1,25 @@
+From e1bb8ee90e18dcf37c0373a45cef530ed25ebc69 Mon Sep 17 00:00:00 2001
+From: Miroslav Ondra <ondra@faster.cz>
+Date: Tue, 10 Sep 2024 21:20:27 +0200
+Subject: [PATCH 01/14] Change order of discovering partitions
+
+---
+ include/config_distro_bootcmd.h | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/include/config_distro_bootcmd.h b/include/config_distro_bootcmd.h
+index 2a136b96..3278ab12 100644
+--- a/include/config_distro_bootcmd.h
++++ b/include/config_distro_bootcmd.h
+@@ -539,7 +539,7 @@
+ 	\
+ 	"scan_dev_for_boot_part="                                         \
+ 		"part list ${devtype} ${devnum} -bootable devplist; "     \
+-		"env exists devplist || setenv devplist 1; "              \
++		"env exists devplist || setenv devplist 2 1; "            \
+ 		"for distro_bootpart in ${devplist}; do "                 \
+ 			"if fstype ${devtype} "                           \
+ 					"${devnum}:${distro_bootpart} "   \
+-- 
+2.39.2
+

@@ -1,0 +1,47 @@
+From e05126b0b5216482172c0757e8bb1eae1f4eaf70 Mon Sep 17 00:00:00 2001
+From: Miroslav Ondra <ondra@faster.cz>
+Date: Sat, 21 Sep 2024 01:37:12 +0200
+Subject: [PATCH] Hotfix loading problem files from btrfs. Remove unwanted
+ prints from btrfs
+
+---
+ fs/btrfs/btrfs.c | 2 --
+ fs/fs.c          | 2 +-
+ 2 files changed, 1 insertion(+), 3 deletions(-)
+
+diff --git a/fs/btrfs/btrfs.c b/fs/btrfs/btrfs.c
+index 1149a3b2..13174377 100644
+--- a/fs/btrfs/btrfs.c
++++ b/fs/btrfs/btrfs.c
+@@ -193,7 +193,6 @@ int btrfs_size(const char *file, loff_t *size)
+ 	ret = btrfs_lookup_path(fs_info->fs_root, BTRFS_FIRST_FREE_OBJECTID,
+ 				file, &root, &ino, &type, 40);
+ 	if (ret < 0) {
+-		printf("Cannot lookup file %s\n", file);
+ 		return ret;
+ 	}
+ 	if (type != BTRFS_FT_REG_FILE) {
+@@ -237,7 +236,6 @@ int btrfs_read(const char *file, void *buf, loff_t offset, loff_t len,
+ 	ret = btrfs_lookup_path(fs_info->fs_root, BTRFS_FIRST_FREE_OBJECTID,
+ 				file, &root, &ino, &type, 40);
+ 	if (ret < 0) {
+-		error("Cannot lookup file %s", file);
+ 		return ret;
+ 	}
+ 
+diff --git a/fs/fs.c b/fs/fs.c
+index acf465bd..8f5ed3c9 100644
+--- a/fs/fs.c
++++ b/fs/fs.c
+@@ -1001,7 +1001,7 @@ int fs_read_alloc(const char *fname, ulong size, uint align, void **bufp)
+ 	char *buf;
+ 	int ret;
+ 
+-	buf = memalign(align, size + 1);
++	buf = memalign(align, size + 1 + 4096);
+ 	if (!buf)
+ 		return log_msg_ret("buf", -ENOMEM);
+ 	addr = map_to_sysmem(buf);
+-- 
+2.39.2
+

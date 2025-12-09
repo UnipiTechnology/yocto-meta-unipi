@@ -1,0 +1,276 @@
+From d80960197706aa5afff1d16334180a802957218a Mon Sep 17 00:00:00 2001
+From: Miroslav Ondra <ondra@faster.cz>
+Date: Wed, 2 Oct 2024 21:47:53 +0200
+Subject: [PATCH] Add support for reading MAC addresses from eprom
+
+---
+ board/raspberrypi/rpi/rpi.c          | 23 ++++++-
+ board/raspberrypi/rpi/uniee_values.h | 95 ++++++++++++++++++++++++----
+ board/raspberrypi/rpi/unipi_eprom.c  | 15 +++++
+ board/raspberrypi/rpi/unipi_eprom.h  |  1 +
+ 4 files changed, 121 insertions(+), 13 deletions(-)
+
+diff --git a/board/raspberrypi/rpi/rpi.c b/board/raspberrypi/rpi/rpi.c
+index dd102c9c..8a2a731e 100644
+--- a/board/raspberrypi/rpi/rpi.c
++++ b/board/raspberrypi/rpi/rpi.c
+@@ -26,6 +26,7 @@
+ #include <watchdog.h>
+ #include <dm/pinctrl.h>
+ #include <usb.h>
++#include <net.h>
+ 
+ #include <i2c_eeprom.h>
+ #include <linux/delay.h>
+@@ -363,6 +364,9 @@ static void set_usbethaddr(void)
+ 	if (!model->has_onboard_eth)
+ 		return;
+ 
++	if (env_get("ethaddr"))
++		return;
++
+ 	if (env_get("usbethaddr"))
+ 		return;
+ 
+@@ -428,7 +432,6 @@ int misc_init_r(void)
+ {
+ 	set_fdt_addr();
+ 	set_fdtfile();
+-	set_usbethaddr();
+ #ifdef CONFIG_ENV_VARS_UBOOT_RUNTIME_CONFIG
+ 	set_board_info();
+ #endif
+@@ -725,6 +728,21 @@ static int check_button_status(void)
+ 	};
+ 	return value;
+ }
++
++static void load_mac_address(u8 index)
++{
++	u8 ethaddr[6];
++	if (get_unipi_eeprom() != 0)
++		return;
++
++	if (unipi_eeprom_get_bytes_property(unipi_eprom, uniee_descriptor,
++	    index?UNIEE_FIELD_TYPE_MAC1:UNIEE_FIELD_TYPE_MAC,
++	    ethaddr, 6) == 6) {
++		if (is_valid_ethaddr(ethaddr)) {
++			eth_env_set_enetaddr_by_index("eth", index,ethaddr);
++		}
++	}
++}
+ #endif
+ 
+ int board_late_init(void)
+@@ -737,11 +755,14 @@ int board_late_init(void)
+         env_set("bootdelay", "2");
+         env_set("bootcmd", "run boot_altboot;bootflow scan -lb");
+     }
++    load_mac_address(0);
++    load_mac_address(1);
+ #endif
+ #ifdef CONFIG_ENV_VARS_UBOOT_RUNTIME_CONFIG
+     env_set("board_name", "UNIPI");
+     env_set("board_rev", "EDGE");
+ #endif
++    set_usbethaddr();
+     return 0;
+ }
+ 
+diff --git a/board/raspberrypi/rpi/uniee_values.h b/board/raspberrypi/rpi/uniee_values.h
+index 51f3bb6a..1e02a22e 100644
+--- a/board/raspberrypi/rpi/uniee_values.h
++++ b/board/raspberrypi/rpi/uniee_values.h
+@@ -17,15 +17,24 @@
+  #define UNIEE_PLATFORM_FAMILY_G1XX   0x02
+  #define UNIEE_PLATFORM_FAMILY_NEURON   0x03
+  #define UNIEE_PLATFORM_FAMILY_AXON   0x05
++ #define UNIEE_PLATFORM_FAMILY_EDGE   0x06
+  #define UNIEE_PLATFORM_FAMILY_PATRON   0x07
+  #define UNIEE_PLATFORM_FAMILY_IRIS   0x0f
++ #define UNIEE_PLATFORM_FAMILY_OEM   0x10
+ 
+ 
++ #define UNIEE_PLATFORM_ID_UNIPI10   0x0001
++ #define UNIEE_PLATFORM_ID_UNIPI11   0x0101
++ #define UNIEE_PLATFORM_ID_UNIPI1L   0x1101
+  #define UNIEE_PLATFORM_ID_G100   0x0002
+  #define UNIEE_PLATFORM_ID_G110   0x0102
+  #define UNIEE_PLATFORM_ID_IRISX1   0x010f
+  #define UNIEE_PLATFORM_ID_IRISX2   0x020f
+  #define UNIEE_PLATFORM_ID_IRISX5   0x030f
++ #define UNIEE_PLATFORM_ID_IRISX7   0x040f
++ #define UNIEE_PLATFORM_ID_IRISX21   0x050f
++ #define UNIEE_PLATFORM_ID_IRISX71   0x060f
++ #define UNIEE_PLATFORM_ID_IRIS_CARD   0xca0f
+  #define UNIEE_PLATFORM_ID_S103   0x0103
+  #define UNIEE_PLATFORM_ID_M103   0x0203
+  #define UNIEE_PLATFORM_ID_M203   0x0303
+@@ -35,39 +44,81 @@
+  #define UNIEE_PLATFORM_ID_L403   0x0703
+  #define UNIEE_PLATFORM_ID_L523   0x0803
+  #define UNIEE_PLATFORM_ID_L533   0x0903
++ #define UNIEE_PLATFORM_ID_S103_G   0x0a03
++ #define UNIEE_PLATFORM_ID_M403   0x0b03
++ #define UNIEE_PLATFORM_ID_M503   0x0c03
++ #define UNIEE_PLATFORM_ID_M603   0x0d03
++ #define UNIEE_PLATFORM_ID_L303   0x0e03
++ #define UNIEE_PLATFORM_ID_L503   0x0f03
++ #define UNIEE_PLATFORM_ID_L513   0x1003
++ #define UNIEE_PLATFORM_ID_S103_E   0x1103
++ #define UNIEE_PLATFORM_ID_S103_I   0x1203
+  #define UNIEE_PLATFORM_ID_S107   0x0107
+  #define UNIEE_PLATFORM_ID_S207   0x0207
+  #define UNIEE_PLATFORM_ID_M207   0x0307
+  #define UNIEE_PLATFORM_ID_M527   0x0407
+  #define UNIEE_PLATFORM_ID_L207   0x0507
+  #define UNIEE_PLATFORM_ID_L527   0x0607
++ #define UNIEE_PLATFORM_ID_S117   0x0707
++ #define UNIEE_PLATFORM_ID_M267   0x0807
++ #define UNIEE_PLATFORM_ID_M567   0x0907
++ #define UNIEE_PLATFORM_ID_S167   0x0a07
++ #define UNIEE_PLATFORM_ID_S227   0x0b07
++ #define UNIEE_PLATFORM_ID_E10100   0x0206
++ #define UNIEE_PLATFORM_ID_AKUZU1   0x0c07
++ #define UNIEE_PLATFORM_ID_ACHE1   0x0110
++ #define UNIEE_PLATFORM_ID_ACHE2   0x0210
++ #define UNIEE_PLATFORM_ID_AKUSO1   0x0106
+ 
+ 
+ /* uniee_bank_2_t.board_model */
+  #define UNIEE_BOARD_MODEL_G_1001_1	1
+  #define UNIEE_BOARD_MODEL_G_1002_1	2
+  #define UNIEE_BOARD_MODEL_IM_SPR485SD_1	3
+- #define UNIEE_BOARD_MODEL_I_GPRS	4
+- #define UNIEE_BOARD_MODEL_I_LTE	5
+- #define UNIEE_BOARD_MODEL_I_RS485	6
+- #define UNIEE_BOARD_MODEL_IC_DIS4_1	100
++ #define UNIEE_BOARD_MODEL_B_1000_1	4
++ #define UNIEE_BOARD_MODEL_B_1000_2	5
++ #define UNIEE_BOARD_MODEL_B_1000_3	6
++ #define UNIEE_BOARD_MODEL_N_1000_1	7
++ #define UNIEE_BOARD_MODEL_N_1001_1	8
++ #define UNIEE_BOARD_MODEL_N_1002_1	9
++ #define UNIEE_BOARD_MODEL_EMO_R8	24
++ #define UNIEE_BOARD_MODEL_IC_DIS4_0	100
+  #define UNIEE_BOARD_MODEL_IC_LORANODE_1	101
+- #define UNIEE_BOARD_MODEL_IC_LIGHT1P_1	103
++ #define UNIEE_BOARD_MODEL_IC_LIGHT1P80_1	103
+  #define UNIEE_BOARD_MODEL_IC_AIF2AO1_1	104
+  #define UNIEE_BOARD_MODEL_IC_DIS2DO2_1	105
+- #define UNIEE_BOARD_MODEL_IC_R485X2R422_1	106
++ #define UNIEE_BOARD_MODEL_IC_R485R485422_1	106
+  #define UNIEE_BOARD_MODEL_IC_AOU4_1	107
+- #define UNIEE_BOARD_MODEL_IC_AIUC8_1	108
+- #define UNIEE_BOARD_MODEL_IC_AIRTD8_1	109
+- #define UNIEE_BOARD_MODEL_IC_DIS8_1	110
+- #define UNIEE_BOARD_MODEL_IC_DO8_1	111
++ #define UNIEE_BOARD_MODEL_ID_AIUC8_1	108
++ #define UNIEE_BOARD_MODEL_ID_AIRTD8_1	109
++ #define UNIEE_BOARD_MODEL_ID_DIS8_1	110
++ #define UNIEE_BOARD_MODEL_ID_DO8_1	111
+  #define UNIEE_BOARD_MODEL_IC_CANFD_1	112
+  #define UNIEE_BOARD_MODEL_IC_ETH100_1	113
+- #define UNIEE_BOARD_MODEL_IC_R232X1_1	114
+- #define UNIEE_BOARD_MODEL_IC_USBSATA_1	115
++ #define UNIEE_BOARD_MODEL_IC_R232_1	114
++ #define UNIEE_BOARD_MODEL_ID_SATA_1	115
+  #define UNIEE_BOARD_MODEL_ID_LTE_1	116
+  #define UNIEE_BOARD_MODEL_IC_GPS_1	117
+  #define UNIEE_BOARD_MODEL_IC_ACCGYRO_1	118
++ #define UNIEE_BOARD_MODEL_IC_DI1RO2_1	119
++ #define UNIEE_BOARD_MODEL_ID_DIS16_1	120
++ #define UNIEE_BOARD_MODEL_ID_DO16_1	121
++ #define UNIEE_BOARD_MODEL_ID_R232X4_1	122
++ #define UNIEE_BOARD_MODEL_ID_AIUC8_2	123
++ #define UNIEE_BOARD_MODEL_IC_DIS4_1	124
++ #define UNIEE_BOARD_MODEL_IC_AI2AO1_1	125
++ #define UNIEE_BOARD_MODEL_ID_EM3F_1	126
++ #define UNIEE_BOARD_MODEL_IC_LORANODE_2	127
++ #define UNIEE_BOARD_MODEL_IC_ZIGBEE_1	128
++ #define UNIEE_BOARD_MODEL_UDELAB01	200
++ #define UNIEE_BOARD_MODEL_IC_IQRF_1	1000
++ #define UNIEE_BOARD_MODEL_ID_ETH100DI1WIFI_1	1001
++ #define UNIEE_BOARD_MODEL_CD_MACHZLM_1	2000
++ #define UNIEE_BOARD_MODEL_CD_ACDISP_1	2001
++ #define UNIEE_BOARD_MODEL_CD_ASUPCM4_1	2002
++ #define UNIEE_BOARD_MODEL_CD_ASUPZULU_1	2003
++ #define UNIEE_BOARD_MODEL_CD_ACPLC_4	2004
++ #define UNIEE_BOARD_MODEL_CD_ACDISP_2	2005
+ 
+ 
+ /* specdata_header_t.field_type */
+@@ -75,6 +126,8 @@
+  #define UNIEE_FIELD_TYPE_RTC	5
+  #define UNIEE_FIELD_TYPE_MAC	6
+  #define UNIEE_FIELD_TYPE_AICAL	7
++ #define UNIEE_FIELD_TYPE_MAC1	8
++ #define UNIEE_FIELD_TYPE_MODEM	9
+ 
+ 
+ /* values of fields stored in uniee_bank_1_t.dummy_data */
+@@ -86,4 +139,22 @@
+ 
+ 
+ 
++
++struct uniee_map {
++  int index;
++  const char *name;
++};
++
++/* specdata_header_t.field_type */
++#define UNIEE_FIELD_TYPE_MAP {\
++ { 4,"BUTTON" },\
++ { 5,"RTC" },\
++ { 6,"MAC" },\
++ { 7,"AICAL" },\
++ { 8,"MAC1" },\
++ { 9,"MODEM" },\
++}
++
++#define DIM(x) (sizeof(x)/sizeof(*(x)))
++
+ #endif
+\ No newline at end of file
+diff --git a/board/raspberrypi/rpi/unipi_eprom.c b/board/raspberrypi/rpi/unipi_eprom.c
+index 994d4436..4b7f2848 100644
+--- a/board/raspberrypi/rpi/unipi_eprom.c
++++ b/board/raspberrypi/rpi/unipi_eprom.c
+@@ -99,6 +99,21 @@ int unipi_eeprom_get_uint_property(u8 *eprom, uniee_descriptor_area* descriptor,
+ 	return len;
+ }
+ 
++/*
++	Find bytes property in memory block from Unipi Eprom
++	returns:
++			- original length of property data
++			- negative number if error
++*/
++int unipi_eeprom_get_bytes_property(u8 *eprom, uniee_descriptor_area* descriptor, int property_type, u8* bytes, int maxlen)
++{
++	int len;
++	u8 *ptr = unipi_eeprom_find_property(eprom, descriptor, property_type, &len);
++
++	if (len <= 0) return len;
++	memcpy(bytes, ptr, min(len,maxlen));
++	return len;
++}
+ /* 
+ 	Find string property in memory block from Unipi Eprom
+ 	returns:
+diff --git a/board/raspberrypi/rpi/unipi_eprom.h b/board/raspberrypi/rpi/unipi_eprom.h
+index 077ce308..21a7ba98 100644
+--- a/board/raspberrypi/rpi/unipi_eprom.h
++++ b/board/raspberrypi/rpi/unipi_eprom.h
+@@ -12,6 +12,7 @@
+ #include "uniee.h"
+ 
+ int unipi_eeprom_get_uint_property(u8 *eprom, uniee_descriptor_area* descriptor, int property_type, unsigned long *value);
++int unipi_eeprom_get_bytes_property(u8 *eprom, uniee_descriptor_area* descriptor, int property_type, u8* bytes, int maxlen);
+ u32 unipi_eeprom_get_serial(uniee_descriptor_area* descriptor);
+ u32 unipi_eeprom_get_sku(uniee_descriptor_area* descriptor);
+ void unipi_eeprom_get_model(uniee_descriptor_area* descriptor, char* str, int maxlen);
+-- 
+2.39.5
+

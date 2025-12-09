@@ -1,0 +1,25 @@
+From 99a482259be18ffb7a43d5f08e928ea4e3d1ccc3 Mon Sep 17 00:00:00 2001
+From: Miroslav Ondra <ondra@faster.cz>
+Date: Fri, 27 Sep 2024 17:13:51 +0200
+Subject: [PATCH] Set console to ttyAMA1
+
+---
+ board/raspberrypi/rpi/rpi.env | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/board/raspberrypi/rpi/rpi.env b/board/raspberrypi/rpi/rpi.env
+index bbde78de..d84f192d 100644
+--- a/board/raspberrypi/rpi/rpi.env
++++ b/board/raspberrypi/rpi/rpi.env
+@@ -77,7 +77,7 @@ scriptaddr=0x02400000
+ pxefile_addr_r=0x02500000
+ fdt_addr_r=0x02600000
+ ramdisk_addr_r=0x02700000
+-console=ttyAMA0"
++console=ttyAMA1"
+ kernel_comp_addr_r=0x0c00000
+ kernel_comp_size=0x1a00000
+ 
+-- 
+2.39.5
+

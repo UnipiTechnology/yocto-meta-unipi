@@ -1,0 +1,25 @@
+From 102c5dbbfb9a519b6260a46b960a3ab7c7ee44e4 Mon Sep 17 00:00:00 2001
+From: Miroslav Ondra <ondra@faster.cz>
+Date: Thu, 13 Feb 2025 17:09:20 +0100
+Subject: [PATCH] Fix rs485_tx_op in rpi.c
+
+---
+ board/raspberrypi/rpi/rpi.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/board/raspberrypi/rpi/rpi.c b/board/raspberrypi/rpi/rpi.c
+index e52e28e4..e12c34de 100644
+--- a/board/raspberrypi/rpi/rpi.c
++++ b/board/raspberrypi/rpi/rpi.c
+@@ -643,7 +643,7 @@ void rs485_tx_op(u32 *cr2, u32 *sr2, int op)
+ 	if (op == 0) {
+ 		if (tx_active) {
+ 			int i = 0;
+-			while (!(readl(sr2) & UART_PL01x_FR_BUSY)) {
++			while ((readl(sr2) & (UART_PL01x_FR_BUSY))) {
+ 				if (++i == 0x1000000) break;
+ 			}
+ 			gpio_set_value(EDGE_RTS, 0);
+-- 
+2.39.5
+

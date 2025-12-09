@@ -1,0 +1,52 @@
+From 717eedc50397272992fd3e3698ebdf65e212c393 Mon Sep 17 00:00:00 2001
+From: Miroslav Ondra <ondra@faster.cz>
+Date: Sat, 21 Sep 2024 01:54:52 +0200
+Subject: [PATCH 16/16] Revert hotfix and backport fix from mainline
+
+---
+ fs/btrfs/inode.c | 8 ++++++--
+ fs/fs.c          | 2 +-
+ 2 files changed, 7 insertions(+), 3 deletions(-)
+
+diff --git a/fs/btrfs/inode.c b/fs/btrfs/inode.c
+index 4691612e..3998ffc2 100644
+--- a/fs/btrfs/inode.c
++++ b/fs/btrfs/inode.c
+@@ -640,7 +640,11 @@ static int read_and_truncate_page(struct btrfs_path *path,
+ 	extent_type = btrfs_file_extent_type(leaf, fi);
+ 	if (extent_type == BTRFS_FILE_EXTENT_INLINE) {
+ 		ret = btrfs_read_extent_inline(path, fi, buf);
+-		memcpy(dest, buf + page_off, min(page_len, ret));
++		if (ret < 0) {
++			free(buf);
++			return ret;
++		}
++		memcpy(dest, buf + page_off, min3(page_len, ret, len));
+ 		free(buf);
+ 		return len;
+ 	}
+@@ -652,7 +656,7 @@ static int read_and_truncate_page(struct btrfs_path *path,
+ 		free(buf);
+ 		return ret;
+ 	}
+-	memcpy(dest, buf + page_off, page_len);
++	memcpy(dest, buf + page_off, min(page_len, len));
+ 	free(buf);
+ 	return len;
+ }
+diff --git a/fs/fs.c b/fs/fs.c
+index 8f5ed3c9..acf465bd 100644
+--- a/fs/fs.c
++++ b/fs/fs.c
+@@ -1001,7 +1001,7 @@ int fs_read_alloc(const char *fname, ulong size, uint align, void **bufp)
+ 	char *buf;
+ 	int ret;
+ 
+-	buf = memalign(align, size + 1 + 4096);
++	buf = memalign(align, size + 1);
+ 	if (!buf)
+ 		return log_msg_ret("buf", -ENOMEM);
+ 	addr = map_to_sysmem(buf);
+-- 
+2.39.2
+

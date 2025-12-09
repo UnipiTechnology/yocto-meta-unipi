@@ -1,0 +1,41 @@
+From 8a7e0a8b7668f99ee1f9d6f3653c72530f161489 Mon Sep 17 00:00:00 2001
+From: Miroslav Ondra <ondra@faster.cz>
+Date: Sat, 14 Sep 2024 12:42:45 +0200
+Subject: [PATCH 3/6] Add support for udma-ranges as override of dma-ranges in
+ U-boot. Required for usb XHCI on CM40
+
+---
+ boot/fdt_support.c           | 4 ++++
+ drivers/usb/host/xhci-brcm.c | 1 +
+ 2 files changed, 5 insertions(+)
+
+diff --git a/boot/fdt_support.c b/boot/fdt_support.c
+index 2392027d..e633ca66 100644
+--- a/boot/fdt_support.c
++++ b/boot/fdt_support.c
+@@ -1553,6 +1553,10 @@ int fdt_get_dma_range(const void *blob, int node, phys_addr_t *cpu,
+ 
+ 	/* Find the closest dma-ranges property */
+ 	while (parent >= 0) {
++		ranges = fdt_getprop(blob, parent, "udma-ranges", &len);
++		if (ranges && len > 0)
++			break;
++
+ 		ranges = fdt_getprop(blob, parent, "dma-ranges", &len);
+ 
+ 		/* Ignore empty ranges, they imply no translation required */
+diff --git a/drivers/usb/host/xhci-brcm.c b/drivers/usb/host/xhci-brcm.c
+index 2ffad148..7d5ffc49 100644
+--- a/drivers/usb/host/xhci-brcm.c
++++ b/drivers/usb/host/xhci-brcm.c
+@@ -81,6 +81,7 @@ static int xhci_brcm_deregister(struct udevice *dev)
+ }
+ 
+ static const struct udevice_id xhci_brcm_ids[] = {
++	{ .compatible = "generic-xhci" },
+ 	{ .compatible = "brcm,generic-xhci" },
+ 	{ }
+ };
+-- 
+2.39.5
+

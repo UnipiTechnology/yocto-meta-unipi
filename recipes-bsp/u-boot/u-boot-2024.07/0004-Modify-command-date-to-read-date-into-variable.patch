@@ -1,0 +1,59 @@
+From d24a5a5e731d903fd5be291e5f912ee717ca10f2 Mon Sep 17 00:00:00 2001
+From: Miroslav Ondra <ondra@faster.cz>
+Date: Tue, 10 Sep 2024 21:26:30 +0200
+Subject: [PATCH 04/14] Modify command date to read date into variable
+
+---
+ cmd/date.c | 22 ++++++++++++++++------
+ 1 file changed, 16 insertions(+), 6 deletions(-)
+
+diff --git a/cmd/date.c b/cmd/date.c
+index 4f98b470..d7154e92 100644
+--- a/cmd/date.c
++++ b/cmd/date.c
+@@ -30,6 +30,7 @@ static int do_date(struct cmd_tbl *cmdtp, int flag, int argc,
+ 	struct rtc_time tm;
+ 	int rcode = 0;
+ 	int old_bus __maybe_unused;
++	char *var = NULL;
+ 
+ 	/* switch to correct I2C bus */
+ #ifdef CONFIG_DM_RTC
+@@ -65,6 +66,9 @@ static int do_date(struct cmd_tbl *cmdtp, int flag, int argc,
+ #endif
+ 			if (rcode)
+ 				puts("## Failed to set date after RTC reset\n");
++
++		} else if ((argv[1][0]>='A') && (argv[1][0]<='z')) {
++			var = argv[1];
+ 		} else {
+ 			/* initialize tm with current time */
+ #ifdef CONFIG_DM_RTC
+@@ -104,12 +108,18 @@ static int do_date(struct cmd_tbl *cmdtp, int flag, int argc,
+ 			break;
+ 		}
+ 
+-		printf ("Date: %4d-%02d-%02d (%sday)    Time: %2d:%02d:%02d\n",
+-			tm.tm_year, tm.tm_mon, tm.tm_mday,
+-			(tm.tm_wday<0 || tm.tm_wday>6) ?
+-				"unknown " : weekdays[tm.tm_wday],
+-			tm.tm_hour, tm.tm_min, tm.tm_sec);
+-
++		if (var == NULL) {
++			printf ("Date: %4d-%02d-%02d (%sday)    Time: %2d:%02d:%02d  Unixtime: %lld\n",
++				tm.tm_year, tm.tm_mon, tm.tm_mday,
++				(tm.tm_wday<0 || tm.tm_wday>6) ?
++					"unknown " : RELOC(weekdays[tm.tm_wday]),
++				tm.tm_hour, tm.tm_min, tm.tm_sec, 
++				rtc_mktime(&tm));
++		} else {
++			char str[32] = { '\0', };
++			sprintf(str, "%lld", rtc_mktime(&tm));
++			env_set(var, str);
++		}
+ 		break;
+ 	default:
+ 		rcode = CMD_RET_USAGE;
+-- 
+2.39.2
+

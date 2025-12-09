@@ -1,0 +1,48 @@
+From 6e56c7daaecd4838b9d501ad041898b35b61c093 Mon Sep 17 00:00:00 2001
+From: Miroslav Ondra <ondra@faster.cz>
+Date: Mon, 9 Dec 2024 13:18:36 +0100
+Subject: [PATCH] Add driver for TPM2 on SPI
+
+---
+ configs/unipi_arm64_defconfig | 8 +++++++-
+ 1 file changed, 7 insertions(+), 1 deletion(-)
+
+diff --git a/configs/unipi_arm64_defconfig b/configs/unipi_arm64_defconfig
+index e163fd7f..43e796f1 100644
+--- a/configs/unipi_arm64_defconfig
++++ b/configs/unipi_arm64_defconfig
+@@ -49,6 +49,7 @@ CONFIG_CMD_BOOTCOUNT=y
+ # CONFIG_CMD_CLS is not set
+ # CONFIG_CMD_EFICONFIG is not set
+ CONFIG_CMD_SYSBOOT=y
++CONFIG_CMD_TPM=y
+ CONFIG_CMD_EXT2=y
+ CONFIG_CMD_EXT4=y
+ CONFIG_CMD_FAT=y
+@@ -77,13 +78,17 @@ CONFIG_BCMGENET=y
+ CONFIG_PCI_BRCMSTB=y
+ CONFIG_PINCTRL=y
+ # CONFIG_PINCTRL_GENERIC is not set
+-CONFIG_DM_RNG=y
+ CONFIG_RNG_IPROC200=y
+ CONFIG_DM_RTC=y
+ CONFIG_RTC_DS1307=y
+ # CONFIG_REQUIRE_SERIAL_CONSOLE is not set
++CONFIG_SPI=y
++CONFIG_DM_SPI=y
++CONFIG_SOFT_SPI=y
+ CONFIG_SYSINFO=y
+ CONFIG_SYSINFO_SMBIOS=y
++# CONFIG_TPM_V1 is not set
++CONFIG_TPM2_TIS_SPI=y
+ CONFIG_USB=y
+ CONFIG_USB_XHCI_HCD=y
+ CONFIG_USB_XHCI_PCI=y
+@@ -97,3 +102,4 @@ CONFIG_VIDEO=y
+ CONFIG_VIDEO_BCM2835=y
+ CONFIG_PHYS_TO_BUS=y
+ CONFIG_FS_BTRFS=y
++CONFIG_TPM=y
+-- 
+2.39.5
+

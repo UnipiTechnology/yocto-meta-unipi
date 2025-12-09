@@ -1,0 +1,50 @@
+From 44df1b72e91584efd4d1429cb8255337e61553fb Mon Sep 17 00:00:00 2001
+From: Miroslav Ondra <ondra@faster.cz>
+Date: Mon, 16 Sep 2024 11:39:11 +0200
+Subject: [PATCH 14/14] Add delay (2.5s) for waiting to power good USB port
+
+---
+ board/raspberrypi/rpi/rpi.c | 23 +++++++++++++++++++++++
+ 1 file changed, 23 insertions(+)
+
+diff --git a/board/raspberrypi/rpi/rpi.c b/board/raspberrypi/rpi/rpi.c
+index fe06dc14..dd102c9c 100644
+--- a/board/raspberrypi/rpi/rpi.c
++++ b/board/raspberrypi/rpi/rpi.c
+@@ -25,6 +25,7 @@
+ #endif
+ #include <watchdog.h>
+ #include <dm/pinctrl.h>
++#include <usb.h>
+ 
+ #include <i2c_eeprom.h>
+ #include <linux/delay.h>
+@@ -784,3 +785,25 @@ int ft_board_setup(void *blob, struct bd_info *bd)
+ }
+ #endif
+ 
++void usb_hub_reset_devices(struct usb_hub_device *hub, int port)
++{
++	const char* env;
++	unsigned int delay = 2500;
++	u32 reg;
++	int ret;
++
++	if (hub && (hub->hub_depth == 0) && (port==1)) {
++		if (dev_has_ofnode(hub->pusb_dev->controller_dev)) {
++			ret = ofnode_read_u32(dev_ofnode(hub->pusb_dev->controller_dev), "reg", &reg);
++			if (ret /*|| (reg != 0x7e9c0000)*/)
++				return;
++		}
++		env = env_get("usb_hub1_delay");
++		if (env)
++			delay = simple_strtoul(env, NULL, 0);
++		printf("(Add usb_hub1_delay=%d ms) ", delay);
++		hub->query_delay += delay;
++		hub->connect_timeout += delay;
++	}
++	return;
++}
+-- 
+2.39.2
+

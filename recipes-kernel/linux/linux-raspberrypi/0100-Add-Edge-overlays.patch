@@ -1,0 +1,795 @@
+From 2169d0ec2c93385b5d9808dda10da50b8e86ce65 Mon Sep 17 00:00:00 2001
+From: Miroslav Ondra <ondra@faster.cz>
+Date: Wed, 12 Feb 2025 14:43:03 +0100
+Subject: [PATCH] Add Edge overlays
+
+---
+ .../arm/boot/dts/broadcom/bcm2711-rpi-cm4.dts |   2 +
+ arch/arm/boot/dts/broadcom/unipi-ds.dtsi      |  54 ++
+ arch/arm/boot/dts/overlays/Makefile           |   7 +
+ .../boot/dts/overlays/antenna2-overlay.dts    |  17 +
+ arch/arm/boot/dts/overlays/ud00cb-overlay.dts | 492 ++++++++++++++++++
+ .../dts/overlays/unipi_e10300-overlay.dts     |  20 +
+ .../boot/dts/overlays/unipi_uboot-overlay.dts |  44 ++
+ .../dts/overlays/unipi_uboot_tpm-overlay.dts  |  78 +++
+ 8 files changed, 714 insertions(+)
+ create mode 100644 arch/arm/boot/dts/broadcom/unipi-ds.dtsi
+ create mode 100644 arch/arm/boot/dts/overlays/antenna2-overlay.dts
+ create mode 100644 arch/arm/boot/dts/overlays/ud00cb-overlay.dts
+ create mode 100644 arch/arm/boot/dts/overlays/unipi_e10300-overlay.dts
+ create mode 100644 arch/arm/boot/dts/overlays/unipi_uboot-overlay.dts
+ create mode 100644 arch/arm/boot/dts/overlays/unipi_uboot_tpm-overlay.dts
+
+diff --git a/arch/arm/boot/dts/broadcom/bcm2711-rpi-cm4.dts b/arch/arm/boot/dts/broadcom/bcm2711-rpi-cm4.dts
+index 9fdb9278c5a2..8d359c2e58b9 100644
+--- a/arch/arm/boot/dts/broadcom/bcm2711-rpi-cm4.dts
++++ b/arch/arm/boot/dts/broadcom/bcm2711-rpi-cm4.dts
+@@ -508,3 +508,5 @@ __overrides__ {
+ 		pcie_tperst_clk_ms = <&pcie0>,"brcm,tperst-clk-ms:0";
+ 	};
+ };
++
++#include "unipi-ds.dtsi"
+diff --git a/arch/arm/boot/dts/broadcom/unipi-ds.dtsi b/arch/arm/boot/dts/broadcom/unipi-ds.dtsi
+new file mode 100644
+index 000000000000..38ff65311677
+--- /dev/null
++++ b/arch/arm/boot/dts/broadcom/unipi-ds.dtsi
+@@ -0,0 +1,54 @@
++// =============================================
++// Downstream rpi- changes
++/ {
++	chosen {
++		/* amba-pl011 */
++		stdout-path = "serial1:115200n8";
++		// stdout-path = "uart0:115200n8"; // Try this instead of serial1
++	};
++};
++
++&scb {
++	udma-ranges = <0x0 0x00000000  0x0 0x00000000  0x4 0x00000000>;
++};
++
++&soc {
++	dmamux: dma-mux@7e204e00 {
++		#address-cells = <1>;
++		#size-cells = <0>;
++		compatible = "brcm,bcm2835-dmamux";
++		reg = <0x7e204e00 0x4>;
++		#dma-cells = <2>;
++		dma-masters = <&dma>;
++	};
++};
++
++&gpio {
++	uart0_u_pins: uart0_u_pins {
++		brcm,pins = <14 15>;
++		brcm,function = <4>; //<BCM2835_FSEL_ALT0>;
++		brcm,pull = <0 2>;
++	};
++	uart0rts_u_pins: uart0rts_u_pins {
++		brcm,pins = <17>;
++		//brcm,function = <0>; //<BCM2835_FSEL_GPIO_OUT>;
++		brcm,function = <7>; //<BCM2835_FSEL_ALT3>;
++		brcm,pull = <2>;
++	};
++};
++
++&uart0 {
++	pinctrl-0 = <&uart0_u_pins>, <&uart0rts_u_pins>;
++	clock = <48000000>;
++	/delete-property/ skip-init;
++};
++
++&uart1 {
++	pinctrl-0 = <&uart1_bt_pins>;
++	clock = <48000000>;
++	/delete-property/ skip-init;
++};
++
++&i2c0 {
++	status = "disabled";
++};
+diff --git a/arch/arm/boot/dts/overlays/Makefile b/arch/arm/boot/dts/overlays/Makefile
+index bdd02b8c6f0f..92d88c97269a 100644
+--- a/arch/arm/boot/dts/overlays/Makefile
++++ b/arch/arm/boot/dts/overlays/Makefile
+@@ -326,6 +326,13 @@ dtbo-$(CONFIG_ARCH_BCM2835) += \
+ 	wittypi.dtbo \
+ 	wm8960-soundcard.dtbo
+ 
++dtbo-$(CONFIG_ARCH_BCM2835) += \
++	antenna2.dtbo \
++	ud00cb.dtbo \
++	unipi_e10300.dtbo \
++	unipi_uboot.dtbo \
++	unipi_uboot_tpm.dtbo
++
+ targets += dtbs dtbs_install
+ targets += $(dtbo-y)
+ 
+diff --git a/arch/arm/boot/dts/overlays/antenna2-overlay.dts b/arch/arm/boot/dts/overlays/antenna2-overlay.dts
+new file mode 100644
+index 000000000000..254d4dc85978
+--- /dev/null
++++ b/arch/arm/boot/dts/overlays/antenna2-overlay.dts
+@@ -0,0 +1,17 @@
++/dts-v1/;
++/plugin/;
++
++/ {
++	fragment@0 {
++		target = <&ant1>;
++		__overlay__ {
++			output-low;
++		};
++	};
++	fragment@1 {
++		target = <&ant2>;
++		__overlay__ {
++			output-high;
++		};
++	};
++};
+diff --git a/arch/arm/boot/dts/overlays/ud00cb-overlay.dts b/arch/arm/boot/dts/overlays/ud00cb-overlay.dts
+new file mode 100644
+index 000000000000..98f21e90d176
+--- /dev/null
++++ b/arch/arm/boot/dts/overlays/ud00cb-overlay.dts
+@@ -0,0 +1,492 @@
++/dts-v1/;
++/plugin/;
++
++/{
++	compatible = "brcm,bcm2711";
++
++	fragment@1 {
++		target = <&spi6_cs_pins>;
++		__overlay__ {
++			brcm,pins = <18>, <23>;
++			brcm,function = <1>; // output input
++			brcm,pull = <0>, <0>;
++		};
++	};
++
++	fragment@2 {
++		target = <&spi6>;
++		__overlay__ {
++			// needed to avoid dtc warning
++			#address-cells = <1>;
++			#size-cells = <0>;
++			compatible = "brcm,bcm2835-spi";
++			pinctrl-names = "default";
++			pinctrl-0 = <&spi6_pins &spi6_cs_pins>;
++			cs-gpios = <&gpio 18 1>, <&gpio 23 1>;
++			dmas = <&dma 23>, <&dma 27>;
++			dma-names = "tx", "rx";
++			status = "okay";
++		};
++	};
++
++	fragment@101 {
++		target-path = "/aliases";
++		__overlay__ {
++			bluetooth = "/soc/serial@7e215040/bluetooth";
++		};
++	};
++
++	fragment@102 {
++		target = <&uart0>;
++		__overlay__ {
++			pinctrl-names = "default";
++			pinctrl-0 = <&uart0_ovl_pins>, <&uart0_rts_ovl_pins>;
++			status = "okay";
++			linux,rs485-enabled-at-boot-time;
++		};
++	};
++
++	fragment@103 {
++		target = <&gpio>;
++		__overlay__ {
++			uart0_ovl_pins: uart0-ovl-pins {
++				brcm,pins = <14 15>;
++				brcm,function = <4>; // alt0
++				brcm,pull = <0 2>;
++			};
++			uart0_rts_ovl_pins: uart0-rts-ovl-pins {
++				brcm,pins = <17>;
++				brcm,function = <7>; // alt3
++				brcm,pull = <0>;
++			};
++		};
++	};
++
++	fragment@104 {
++		target = <&bt>;
++		__overlay__ {
++			status = "disabled";
++		};
++	};
++
++	fragment@105 {
++		target = <&uart1>;
++		__overlay__ {
++			pinctrl-names = "default";
++			pinctrl-0 = <&uart1_bt_pins>;
++			status = "okay";
++		};
++	};
++
++	fragment@108 {
++		target = <&minibt>;
++		__overlay__ {
++			status = "okay";
++		};
++	};
++
++        fragment@150 {
++                target = <&uart2>;
++                __overlay__ {
++                        pinctrl-names = "default";
++                        pinctrl-0 = <&uart2_pins>, <&pinctrl_uart2_rts>;
++                        status = "okay";
++                        linux,rs485-enabled-at-boot-time;
++                        rts-gpios = <&gpio 16 0>; // GPIO_ACTIVE_HIGH
++                };
++        };
++
++        fragment@151 {
++                target = <&gpio>;
++                __overlay__ {
++                        pinctrl_uart2_rts: pinctrl-uart2-rts {
++                                brcm,pins = <16>;
++                                brcm,function = <1>; // out
++                                brcm,pull = <0>; // off
++                        };
++                };
++        };
++
++	fragment@201 {
++		target = <&spi6>;
++		__overlay__ {
++			// needed to avoid dtc warning
++			#address-cells = <1>;
++			#size-cells = <0>;
++
++			unipispi6_0: unipispi@0 {
++				compatible = "unipi,unipispi";
++				reg = <0>;
++				#address-cells = <1>;
++				#size-cells = <0>;
++				modbus-address = <1>;
++				spi-max-frequency = <6000000>;
++				status = "okay";
++
++				iogroup1: iogroup@1 {
++					compatible = "unipi,unipi-mfd", "iogroup";
++					reg = <1>;
++					board_name = "UDELAB0302";
++					cycle_counter = <1019>;
++					fw_name = "UDELAB0302";
++					fw_variant = <0x3230>;
++					//interrupt-parent = <&gpio>;
++					//interrupts = <24 0x1>;     // IRQ_TYPE_EDGE_RISING
++					//master_watchdog_enable = <6>;
++					pinctrl-0 = <&pinctrl_stm32_irq>; 
++					pinctrl-names = "default";
++
++					di {
++						compatible = "unipi,gpio-di";
++						gpio-controller;
++						#gpio-cells = <2>;
++						gpio-line-names = "DI1", "DI2", "DI3", "DI4";
++						ngpio = <4>;
++						value-reg = <0>;
++						debounce-reg = <1010>;
++						counter-reg = <3>;
++					};
++					do {
++						compatible = "unipi,gpio-do";
++						ngpio = <2>;
++						value-coil = <0>;
++						gpio-controller;
++						#gpio-cells = <2>;
++						gpio-line-names = "DO1", "DO2";
++					};
++					led {
++						compatible = "unipi,leds";
++						coil-range = <6 1>;
++						label-prefix = "unipi:green:uled-x";
++					};
++				};
++			};
++		};
++	};
++
++	fragment@202 {
++		target = <&gpio>;
++		__overlay__ {
++			pinctrl_stm32_irq: pinctrl-stm32-irq {
++				brcm,pins = <24>;
++				brcm,function = <0>; // in
++				brcm,pull = <1>;     // on
++			};
++		};
++	};
++
++	fragment@400 {
++		target = <&xhci>;
++		__overlay__ {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			smsc-hub@1 {
++				reg = <1>;
++				compatible = "usb0424,9514";
++				#address-cells = <1>;
++				#size-cells = <0>;
++				ethernet1:eth1@1 {
++					reg = <1>;
++					compatible = "usb0424,ec00";
++				};
++				mpcie:mpcie@2 {
++					reg = <2>;
++				};
++			};
++		};
++	}; 
++
++	fragment@401 {
++		target-path = "/aliases";
++		__overlay__ {
++			// Must be defined absolutly - Tady je problem v ruznuch nazvech usb/xhci v DT mainline/rpi
++			ethernet1 = "/scb/usb@7e9c0000/smsc-hub@1/eth1@1";
++		};
++	};
++
++	fragment@403 {
++		target-path = "/";
++		__overlay__ {
++			lte_kill{
++				compatible = "unipi,rfkill-level";
++				type = "wwan";
++				algo = "pulse";
++				rfkill-gpio = <&gpio 44 1>;
++				monitor-usb = <&mpcie>;
++				pinctrl-names = "default";
++				pinctrl-0 = <&pinctrl_lte_reset>;
++			};
++		};
++	}; 
++
++	fragment@404 {
++		target = <&gpio>;
++		__overlay__ {
++			pinctrl_lte_reset: pinctrl-lte-reset {
++				brcm,pins = <44>;
++				brcm,function = <1>; // out
++				brcm,pull = <0>; // off
++			};
++		};
++	};
++
++         fragment@500 {
++                target = <&i2c1>;
++                __overlay__ {
++                        #address-cells = <0x01>;
++                        #size-cells = <0x00>;
++                        status = "okay";
++                        //clock-frequency = <400000>;  // Set I2C1 frequency to 400 kHz
++
++                        temp1: temp1@48 {
++                                #thermal-sensor-cells = <0>;
++                                compatible = "ti,tmp1075";
++                                reg = <0x48>;
++                                status = "okay";
++                                thermal-zones = <&pcb_thermal>;
++                                vs-supply = <&vdd3v3_reg>;
++                        };
++                        temp2: temp2@49 {
++                                #thermal-sensor-cells = <0>;
++                                compatible = "ti,tmp1075";
++                                reg = <0x49>;
++                                status = "okay";
++                                thermal-zones = <&smps_thermal>;
++                                vs-supply = <&vdd3v3_reg>;
++                        };
++                };
++        };
++
++        fragment@501 {
++                target-path = "/";
++                __overlay__ {
++                        thermal-zones {
++                                pcb_thermal: pcb-thermal {
++                                        polling-delay-passive = <250>; // milliseconds
++                                        polling-delay = <1000>; // milliseconds
++                                        // sensor       ID
++                                        thermal-sensors = <&temp1>;
++                                        trips {
++                                                pcb_hot: trip-point0 {
++                                                        temperature = <50000>;  // 70  C trip point
++                                                        hysteresis = <5000>;  // 5  C hysteresis
++                                                        type = "hot";
++                                                };
++                                                pcb_overheat: trip-point1 {
++                                                        temperature = <490000>;  // 70  C trip point
++                                                        hysteresis = <5000>;  // 5  C hysteresis
++                                                        type = "critical";
++                                                };
++                                        };
++                                };
++                                smps_thermal: smps-thermal {
++                                        polling-delay-passive = <250>; // milliseconds
++                                        polling-delay = <1000>; // milliseconds
++                                        // sensor       ID 
++                                        thermal-sensors = <&temp2>;
++                                        trips {
++                                                smps_overheat1: trip-point0 {
++                                                        temperature = <60000>;  // 70  C trip point
++                                                        hysteresis = <2000>;  // 5  C hysteresis
++                                                        type = "active";
++                                                };
++                                                smps_overheat2: trip-point1 {
++                                                        temperature = <65000>;  // 70  C trip point
++                                                        hysteresis = <2000>;  // 5  C hysteresis
++                                                        type = "passive";
++                                                };
++                                                smps_overheat3: trip-point2 {
++                                                        temperature = <70000>;  // 70  C trip point
++                                                        hysteresis = <2000>;  // 5  C hysteresis
++                                                        type = "hot";
++                                                };
++                                                smps_hot: trip-point3 {
++                                                        temperature = <495000>;  // 70  C trip point
++                                                        hysteresis = <5000>;  // 5  C hysteresis
++                                                        type = "critical";
++                                                };
++
++                                        };
++                                };
++                        };
++                };
++        };
++
++	fragment@600 {
++		target-path = "/";
++		__overlay__ {
++
++
++			gpio_keys: gpio-keys {
++				compatible = "gpio-keys";
++				pinctrl-names = "default";
++				pinctrl-0 = <&pinctrl_service_button>;
++				label = "Service Button";
++
++				button {
++					label = "Service Button";
++					gpios = <&gpio 25 0>; // ACTIVE_HIGH
++					linux,code = <28>; // KEY_ENTER
++					debounce-interval = <50>;
++				};
++			};
++
++
++		};
++	};
++	fragment@601 {
++		target = <&gpio>;
++		__overlay__ {
++                        pinctrl_service_button: pinctrl-service-button {
++				brcm,pins = <25>;
++				brcm,function = <0>; // input
++			};
++		};
++	};
++ 
++	fragment@701 {
++		target = <&gpio>;
++		__overlay__ {
++			wd_pins: wd-pins {
++				brcm,pins = <27>;
++				brcm,function = <1>; // output
++			};
++			reset_pins: reset-pins {
++				brcm,pins = <26>;
++				brcm,function = <1>; // output
++			};
++		};
++	};
++
++	fragment@702 {
++		target-path = "/";
++		__overlay__ {
++			wdt_gpio: wdt-gpio {
++				compatible = "linux,wdt-gpio";
++				//always-running;
++				hw_margin_ms = <4000>;
++				hw_algo = "level";
++				pinctrl-names = "default";
++                                timeout-sec = <10>;
++				pinctrl-0 = <&wd_pins>;
++				gpios = <&gpio 27 0>;
++				status = "okay";
++			};
++			gpio_restart: gpio-restart {
++				compatible = "gpio-restart";
++				open-source;
++				gpios = <&gpio 26 0>;
++				priority = <255>; // <128> or <255>
++				active-delay = <100>;
++				inactive-delay = <100>;
++				wait-delay = <3000>;
++				pinctrl-names = "default";
++				pinctrl-0 = <&reset_pins>;
++				status = "okay";
++			};
++
++			// Regulator node to avoid "dummy regulator" messages
++			vdd3v3_reg: regulator-vdd {
++				compatible = "regulator-fixed";
++				regulator-name = "vdd3v3_reg";
++				regulator-min-microvolt = <3300000>;
++				regulator-max-microvolt = <3300000>;
++			};
++		};
++	};
++
++	fragment@801 {
++		target = <&spi6>;
++		__overlay__ {
++			// needed to avoid dtc warning
++			#address-cells = <1>;
++			#size-cells = <0>;
++
++			tpm_spi: tpm-spi@1 {
++				compatible = "infineon,slb9670";
++				reg = <1>;
++				#address-cells = <1>;
++				#size-cells = <0>;
++
++				spi-max-frequency = <33000000>;
++				status = "okay";
++			};
++		};
++	};
++
++	fragment@901 {
++		target = <&i2c1>;
++		__overlay__ {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			uleds_gpio: pca9505@20 {
++				compatible = "nxp,pca9505";
++				reg = <0x20>;
++				gpio-controller;
++				#gpio-cells = <2>;
++				vcc-supply = <&vdd3v3_reg>;
++				reserved {
++					gpio-hog;
++					gpios = <5 0>, <6 0>, <8 0>, <9 0>,
++					        <10 0>, <11 0>, <15 0>, <16 0>,
++					        <17 0>, <18 0>, <19 0>, <20 0>,
++					        <21 0>, <22 0>, <23 0>,
++					        <25 0>, <26 0>, <27 0>, <28 0>,
++					        <29 0>, <30 0>, <31 0>;
++					input;
++				};
++			};
++		};
++	};
++
++	fragment@3 {
++		target-path = "/";
++		__overlay__ {
++			sysled:sysled {
++				compatible = "gpio-leds";
++	act-led {
++		gpios = <&uleds_gpio 7 1>;
++		default-state = "off";
++		linux,default-trigger = "heartbeat";
++	};
++	sim-led {
++		gpios = <&uleds_gpio 12 1>;
++		default-state = "off";
++	};
++	net-led {
++		gpios = <&uleds_gpio 13 1>;
++		default-state = "off";
++	};
++	sig-led {
++		gpios = <&uleds_gpio 14 1>;
++		default-state = "off";
++	};
++	int-led {
++		gpios = <&uleds_gpio 24 1>;
++		default-state = "off";
++	};
++	rs485-1-txled {
++		gpios = <&uleds_gpio 4 1>;
++		linux,default-trigger = "tty";
++	};
++	rs485-1-rxled {
++		gpios = <&uleds_gpio 3 1>;
++		linux,default-trigger = "tty";
++	};
++	rs485-2-txled {
++		gpios = <&uleds_gpio 2 1>;
++		linux,default-trigger = "tty";
++	};
++	rs485-2-rxled {
++		gpios = <&uleds_gpio 1 1>;
++		linux,default-trigger = "tty";
++	};
++	wifi-led {
++		gpios = <&uleds_gpio 0 1>;
++		linux,default-trigger = "netdev";
++	};
++			};
++		};
++	};
++
++};
+diff --git a/arch/arm/boot/dts/overlays/unipi_e10300-overlay.dts b/arch/arm/boot/dts/overlays/unipi_e10300-overlay.dts
+new file mode 100644
+index 000000000000..968d553f3e80
+--- /dev/null
++++ b/arch/arm/boot/dts/overlays/unipi_e10300-overlay.dts
+@@ -0,0 +1,20 @@
++/dts-v1/;
++/plugin/;
++
++/{
++	compatible = "brcm,bcm2711";
++
++	fragment@28 {
++		target = <&phy1>;
++		__overlay__ {
++			led-modes = <0x00 0x08>;
++		};
++	};
++
++	fragment@29 {
++		target = <&pcie0>;
++		__overlay__ {
++			status = "disabled";
++		};
++	};
++};
+\ No newline at end of file
+diff --git a/arch/arm/boot/dts/overlays/unipi_uboot-overlay.dts b/arch/arm/boot/dts/overlays/unipi_uboot-overlay.dts
+new file mode 100644
+index 000000000000..9c6464349bb7
+--- /dev/null
++++ b/arch/arm/boot/dts/overlays/unipi_uboot-overlay.dts
+@@ -0,0 +1,44 @@
++/dts-v1/;
++/plugin/;
++
++/ {
++	fragment@0 {
++		target-path = "/";
++		__overlay__ {
++			unipi_id: unipi-id {
++				compatible = "unipi,unipi-id";
++				nvmem = <&unipi_mb>;
++				nvmem-names = "plcid0";
++				id-channel = <&i2c1>;
++			};
++
++			bootcount0 {
++				compatible = "u-boot,bootcount-rtc";
++				rtc = <&rtc_i2c>;
++				offset = <0x20>;
++			};
++		};
++	};
++
++	fragment@1 {
++		target = <&i2c1>;
++
++		__overlay__ {
++			#address-cells = < 0x01 >;
++			#size-cells = < 0x00 >;
++			status = "okay";
++
++			unipi_mb:24c01@57 {
++				compatible = "atmel,24c01";
++				reg = <0x57>;
++				status = "okay";
++			};
++
++			rtc_i2c:mcp7940x@6f {
++				compatible = "microchip,mcp7940x";
++				reg = <0x6f>;
++				status = "okay";
++			};
++		};
++	};
++};
+diff --git a/arch/arm/boot/dts/overlays/unipi_uboot_tpm-overlay.dts b/arch/arm/boot/dts/overlays/unipi_uboot_tpm-overlay.dts
+new file mode 100644
+index 000000000000..f369964043e2
+--- /dev/null
++++ b/arch/arm/boot/dts/overlays/unipi_uboot_tpm-overlay.dts
+@@ -0,0 +1,78 @@
++/dts-v1/;
++/plugin/;
++
++/ {
++	fragment@0 {
++		target-path = "/";
++		__overlay__ {
++			unipi_id: unipi-id {
++				compatible = "unipi,unipi-id";
++				nvmem = <&unipi_mb>;
++				nvmem-names = "plcid0";
++				id-channel = <&i2c1>;
++			};
++
++			bootcount0 {
++				compatible = "u-boot,bootcount-rtc";
++				rtc = <&rtc_i2c>;
++				offset = <0x20>;
++			};
++		};
++	};
++
++	fragment@1 {
++		target = <&i2c1>;
++
++		__overlay__ {
++			#address-cells = < 0x01 >;
++			#size-cells = < 0x00 >;
++			status = "okay";
++
++			unipi_mb:24c01@57 {
++				compatible = "atmel,24c01";
++				reg = <0x57>;
++				status = "okay";
++			};
++
++			rtc_i2c:mcp7940x@6f {
++				compatible = "microchip,mcp7940x";
++				reg = <0x6f>;
++				status = "okay";
++			};
++		};
++	};
++
++	fragment@2 {
++		target = <&spi6_cs_pins>;
++		__overlay__ {
++			brcm,pins = <18>, <23>, <19>, <20>, <21> ;
++			brcm,function = <0>, <1>, <0>, <1>, <1>; // output input
++			brcm,pull = <1>, <0>, <0>, <0>, <0>;
++		};
++	};
++
++	fragment@3 {
++		target = <&spi6>;
++		__overlay__ {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			compatible = "spi-gpio";
++			pinctrl-names = "default";
++			pinctrl-0 = <&spi6_cs_pins>;
++			gpio-sck = <&gpio 21 0>;
++			gpio-mosi = <&gpio 20 0>;
++			gpio-miso = <&gpio 19 0>;
++			cs-gpios = <&gpio 23 1>;
++			spi-delay-us = <0>;
++			status = "okay";
++
++			tpm_spi: tpm-spi@1 {
++				compatible = "infineon,slb9670", "tis,tpm2-spi", "tcg,tpm_tis-spi";
++				reg = <1>;
++				#address-cells = <1>;
++				#size-cells = <0>;
++				status = "okay";
++			};
++		};
++	};
++};
+-- 
+2.39.5
+

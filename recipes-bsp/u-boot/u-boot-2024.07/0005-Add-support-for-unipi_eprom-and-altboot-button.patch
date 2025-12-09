@@ -1,0 +1,716 @@
+From d52e4aec4df9776aa31be6d6d62283033c59e615 Mon Sep 17 00:00:00 2001
+From: Miroslav Ondra <ondra@faster.cz>
+Date: Tue, 10 Sep 2024 21:56:03 +0200
+Subject: [PATCH 05/14] Add support for unipi_eprom and altboot button
+
+---
+ board/raspberrypi/rpi/Makefile       |   4 +
+ board/raspberrypi/rpi/rpi.c          | 137 ++++++++++++++++
+ board/raspberrypi/rpi/rpi.env        |   7 +-
+ board/raspberrypi/rpi/uniee.h        | 226 +++++++++++++++++++++++++++
+ board/raspberrypi/rpi/uniee_values.h |  89 +++++++++++
+ board/raspberrypi/rpi/unipi_eprom.c  | 143 +++++++++++++++++
+ board/raspberrypi/rpi/unipi_eprom.h  |  19 +++
+ 7 files changed, 624 insertions(+), 1 deletion(-)
+ create mode 100644 board/raspberrypi/rpi/uniee.h
+ create mode 100644 board/raspberrypi/rpi/uniee_values.h
+ create mode 100644 board/raspberrypi/rpi/unipi_eprom.c
+ create mode 100644 board/raspberrypi/rpi/unipi_eprom.h
+
+diff --git a/board/raspberrypi/rpi/Makefile b/board/raspberrypi/rpi/Makefile
+index b1186cdf..8bad67ff 100644
+--- a/board/raspberrypi/rpi/Makefile
++++ b/board/raspberrypi/rpi/Makefile
+@@ -4,3 +4,7 @@
+ 
+ obj-y	:= rpi.o
+ obj-y	+= lowlevel_init.o
++
++ifdef CONFIG_I2C_EEPROM
++obj-y += unipi_eprom.o
++endif
+diff --git a/board/raspberrypi/rpi/rpi.c b/board/raspberrypi/rpi/rpi.c
+index 2851ebc9..18c74cb9 100644
+--- a/board/raspberrypi/rpi/rpi.c
++++ b/board/raspberrypi/rpi/rpi.c
+@@ -25,6 +25,13 @@
+ #include <watchdog.h>
+ #include <dm/pinctrl.h>
+ 
++#include <i2c_eeprom.h>
++#include <linux/delay.h>
++ #define htobe16(x) cpu_to_be16(x)
++#include "uniee.h"
++#include "uniee_values.h"
++#include "unipi_eprom.h"
++
+ DECLARE_GLOBAL_DATA_PTR;
+ 
+ /* Assigned in lowlevel_init.S
+@@ -568,9 +575,122 @@ void  update_fdt_from_fw(void *fdt, void *fw_fdt)
+ 	copy_property(fdt, fw_fdt, "ethernet0/mdio@e14/ethernet-phy@1", "reg");
+ }
+ 
++
++#define UNIPI_EEPROM_SIZE UNIEE_MIN_EE_SIZE
++static u8 unipi_eprom[UNIPI_EEPROM_SIZE] __aligned(32);
++static int unipi_eprom_validity = -1;
++uniee_descriptor_area* uniee_descriptor;
++
++#ifdef CONFIG_I2C_EEPROM
++static int get_unipi_eeprom(void)
++{
++	int ret;
++	struct udevice *dev;
++
++	if (unipi_eprom_validity >= 0) {
++		return unipi_eprom_validity;
++	}
++	ret = uclass_first_device_err(UCLASS_I2C_EEPROM, &dev);
++	if (ret)
++		return ret;
++
++	ret = i2c_eeprom_read(dev, 0x0, unipi_eprom, UNIPI_EEPROM_SIZE);
++	if (ret) {
++		return ret;
++	}
++
++    /* check unipi mark */
++	uniee_descriptor = uniee_get_valid_descriptor(unipi_eprom, UNIPI_EEPROM_SIZE);
++	if (uniee_descriptor == NULL) {
++		unipi_eprom_validity = 1;
++		return -1;
++	}
++
++	uniee_fix_legacy_content(unipi_eprom, UNIPI_EEPROM_SIZE, uniee_descriptor);
++	unipi_eprom_validity = 0;
++	return 0;
++
++/*	if ((unipi_eprom[UNIPI_EEPROM_SLOT3_OFFSET] != 0xfa) || (unipi_eprom[UNIPI_EEPROM_SLOT3_OFFSET+1] != 0x55)) {
++		unipi_eprom_validity = 1;
++		return -1;
++	}
++	unipi_eprom_validity = 0;
++	return 0;
++*/
++}
++
++#define NEURON_BUTTON 12
++#define EDGE_BUTTON 25
++
++static int check_button_status(void)
++{
++	ulong button = 0;
++	ulong value = 0;
++	/* if not valid eprom  buttons are unusable */
++	if (get_unipi_eeprom() != 0)
++		return 0;
++
++	//gpio_request(RTS_BUTTON, "rts button");
++	if (unipi_eeprom_get_uint_property(unipi_eprom, uniee_descriptor, UNIEE_FIELD_TYPE_BUTTON, &button) < 0) {
++		button = 0;
++	}
++	switch (button) {
++		//case UNIEE_FIELD_VALUE_BUTTON_IRIS:
++		//	/* check pin GPIO4_27 (UART3_RTS) - button + RTS on IRIS model, RTS only on Patron */
++		//	gpio_direction_input(RTS_BUTTON);
++		//	value = gpio_get_value(RTS_BUTTON);
++		//	break;
++		case UNIEE_FIELD_VALUE_BUTTON_NEURON:
++			gpio_request(NEURON_BUTTON, "neuron button");
++			gpio_direction_input(NEURON_BUTTON);
++			value = gpio_get_value(NEURON_BUTTON);
++			break;
++		case UNIEE_FIELD_VALUE_BUTTON_EDGE:
++			gpio_request(EDGE_BUTTON, "edge button");
++			gpio_direction_input(EDGE_BUTTON);
++			value = gpio_get_value(EDGE_BUTTON);
++			break;
++		default:
++			/* unknown button */
++			return 0;
++	}
++	printf("BUTTON type:%ld value: %ld\n", button, value);
++
++	if ((value == 0) && (button != 0)) {
++		env_set("bootdelay", "-2");
++		return 0;
++	};
++	return value;
++}
++#endif
++
++int board_late_init(void)
++{
++#ifdef CONFIG_I2C_EEPROM
++    if (check_button_status()) {
++        //gpio_direction_output(RTS_BUTTON,1);
++        printf("Switch off BUTTON and press a KEY on console to break autoboot!\n");
++        //gpio_direction_output(RTS_BUTTON,0);
++        /* ToDo: switch console uart into rs485 mode */
++        env_set("bootdelay", "2");
++        env_set("bootcmd", "run boot_altboot;run distro_bootcmd");
++        //tx_active = 0;
++        //rs485_enable = 1;
++    }
++#endif
++#ifdef CONFIG_ENV_VARS_UBOOT_RUNTIME_CONFIG
++    env_set("board_name", "UNIPI");
++    env_set("board_rev", "EDGE");
++#endif
++    return 0;
++}
++
++
++#ifdef CONFIG_OF_BOARD_SETUP
+ int ft_board_setup(void *blob, struct bd_info *bd)
+ {
+ 	int node;
++    char tmpstr[20];
+ 
+ 	update_fdt_from_fw(blob, (void *)fw_dtb_pointer);
+ 
+@@ -586,5 +706,22 @@ int ft_board_setup(void *blob, struct bd_info *bd)
+ 			   EFI_RESERVED_MEMORY_TYPE);
+ #endif
+ 
++#ifdef CONFIG_I2C_EEPROM
++    if (get_unipi_eeprom() != 0)
++        return 0;
++
++    if (snprintf(tmpstr, sizeof(tmpstr)-1, "%u", unipi_eeprom_get_serial(uniee_descriptor)) >= 0) {
++        tmpstr[sizeof(tmpstr)-1]= '\0';
++        fdt_setprop(blob, 0, "unipi-serial", tmpstr, strlen(tmpstr) + 1);
++    }
++    if (snprintf(tmpstr, sizeof(tmpstr)-1, "%u", unipi_eeprom_get_sku(uniee_descriptor)) >= 0) {
++        tmpstr[sizeof(tmpstr)-1]= '\0';
++        fdt_setprop(blob, 0, "unipi-sku", tmpstr, strlen(tmpstr) + 1);
++    }
++    unipi_eeprom_get_model(uniee_descriptor, tmpstr, sizeof(tmpstr));
++    fdt_setprop(blob, 0, "unipi-model", tmpstr, strlen(tmpstr) + 1);
++#endif
+ 	return 0;
+ }
++#endif
++
+diff --git a/board/raspberrypi/rpi/rpi.env b/board/raspberrypi/rpi/rpi.env
+index 30228285..2f2511a7 100644
+--- a/board/raspberrypi/rpi/rpi.env
++++ b/board/raspberrypi/rpi/rpi.env
+@@ -73,5 +73,10 @@ scriptaddr=0x02400000
+ pxefile_addr_r=0x02500000
+ fdt_addr_r=0x02600000
+ ramdisk_addr_r=0x02700000
++console=ttyAMA0"
++kernel_comp_addr_r=0x0c00000
++kernel_comp_size=0x1a00000
+ 
+-boot_targets=mmc usb pxe dhcp
++boot_targets=mmc usb dhcp pxe
++
++boot_altboot=setenv boot_prefixes /altboot/ /boot/altboot/ ${boot_prefixes}; usb start; run bootcmd_usb0; setenv bootpretryperiod 3000
+diff --git a/board/raspberrypi/rpi/uniee.h b/board/raspberrypi/rpi/uniee.h
+new file mode 100644
+index 00000000..da2b7dc0
+--- /dev/null
++++ b/board/raspberrypi/rpi/uniee.h
+@@ -0,0 +1,226 @@
++/*
++ * eestruct.h
++ *
++ *  Created on: Nov 12, 2021
++ *      Author: martyy
++ */
++
++#ifndef UNIEE_H_
++#define UNIEE_H_
++
++/*
++#if defined (CONFIG_MODULES) || defined (CONFIG_SYS_BOARD)
++ #include <linux/types.h>
++ #include <linux/string.h>
++ #include <asm/byteorder.h>
++ #define htobe16(x) cpu_to_be16(x)
++#else
++ #include <stdint.h>
++ #include <string.h>
++ #include <endian.h>
++#endif
++*/
++
++ #include "uniee_values.h"
++
++#define UNIEE_SIGNATURE htobe16(0xFA55)
++#define UNIEE_MIN_EE_SIZE 128
++#define UNIEE_MAX_EE_SIZE 256
++#define UNIEE_BANK_CNT 4
++#define UNIEE_BANK_SIZE 32
++#define UNIEE_INFO_AREA_SIZE (2*UNIEE_BANK_SIZE)
++#define UNIEE_MAX_SPECDATA_AREA_SIZE (UNIEE_MAX_EE_SIZE - UNIEE_INFO_AREA_SIZE)
++
++
++typedef struct __attribute__((__packed__)){
++	uint8_t major;
++	uint8_t minor;
++}version16_t;
++
++typedef struct __attribute__((__packed__)){
++	uint8_t bitmask;
++	uint8_t bitmask_inverted;
++}mervic_options_t;
++
++typedef union __attribute__((__packed__)){
++	struct {
++		uint8_t platform_family;
++		uint8_t platform_series;
++	} parsed;
++	uint16_t raw_id;
++}platform_id_t;
++
++typedef struct __attribute__((__packed__)){
++	uint8_t field_type;
++	uint8_t field_len;
++} specdata_header_t;
++
++typedef uint16_t board_model_t;
++
++/* Bank 0 - Board specific data*/
++typedef struct{
++	uint8_t dummy_data [32];
++}uniee_bank_0_t;
++
++/* Bank 1 - Board specific data */
++typedef struct {
++	uint8_t dummy_data [32];
++}uniee_bank_1_t;
++
++/* Bank 2 - Board info */
++typedef struct __attribute__((__packed__)){
++	uint32_t board_serial;
++	version16_t board_version;
++	board_model_t board_model;
++	specdata_header_t specdata_headers_table[12];
++}uniee_bank_2_t;
++
++typedef struct __attribute__((__packed__)){
++	uint32_t board_serial;
++	version16_t board_version;
++	int16_t rtc_calibration;
++	board_model_t board_model;
++	specdata_header_t specdata_headers_table[11];
++}uniee_bank_2_legacy_t;
++
++/* Bank 3 - Product info */
++typedef struct __attribute__((__packed__)){
++	uint16_t ee_signature;
++	version16_t product_version;
++	uint32_t product_serial;
++	mervic_options_t mervis_license;
++	uint8_t model_str [6];
++	uint32_t sku;
++	uint8_t dummy_data [8];
++	platform_id_t platform_id;
++	uint16_t checksum;
++}uniee_bank_3_t;
++
++
++///* 128 bytes eeprom space */
++//typedef struct {
++//	//uniee_bank_0_t bank_0;
++//	//uniee_bank_1_t bank_1;
++//	uint8_t board_specific_area[64];
++//	uniee_bank_2_t bank_2;
++//	uniee_bank_3_t bank_3;
++//}uniee_content_128_t;
++//
++
++///* 256 bytes eeprom space */
++//typedef struct {
++//	//uniee_bank_0_t bank_0;
++//	//uniee_bank_1_t bank_1;
++//	uint8_t board_specific_area[64+128];
++//	uniee_bank_2_t bank_2;
++//	uniee_bank_3_t bank_3;
++//}uniee_content_256_t;
++
++/* 256 bytes eeprom space */
++/*
++typedef struct {
++	//uniee_bank_0_t bank_0;
++	//uniee_bank_1_t bank_1;
++	//uint8_t board_specific_area[64+128];
++	uint8_t board_specific_area[];
++	uniee_bank_2_t bank_2;
++	uniee_bank_3_t bank_3;
++}uniee_content_t;
++*/
++
++typedef struct {
++	uniee_bank_2_t board_info;
++	uniee_bank_3_t product_info;
++}uniee_descriptor_area;
++
++
++/**
++ * Compute checksum from loaded EEPROM data and puts it to the right place in the buffer.
++ * This function does not write the checksum physically to the memory, @see uniee_write_bank()
++ * @return Checksum value
++ */
++uint16_t uniee_checksum_fill(void);
++
++/**
++ * Compute checksum from loaded EEPROM data and compare with the stored value.
++ * @return Zero if success, -1 otherwise
++ */
++int uniee_checksum_verify(void);
++
++/**
++ * Check if EEPROM is virgin
++ * @return
++ */
++int uniee_is_empty(void);
++
++int uniee_fix_content(void);
++
++
++static inline uniee_descriptor_area* uniee_get_valid_descriptor(uint8_t* buff, int size)
++{
++	uniee_descriptor_area *descriptor;
++	if (size < sizeof(uniee_descriptor_area) || buff==NULL){
++		// EEprom has to have minimal size for descriptor area
++		return NULL;
++	}
++
++	/* ToDo: check alignment or verify size leading banks */
++	descriptor = (uniee_descriptor_area*) (buff + (size - sizeof(uniee_descriptor_area)));
++	if (descriptor->product_info.ee_signature != UNIEE_SIGNATURE){
++		return NULL;
++	}
++	/* ToDo: softly check CRC */
++
++	return descriptor;
++}
++
++static inline void uniee_fix_legacy_content(uint8_t* buff, int size, uniee_descriptor_area *descriptor)
++{
++	/* Check and fix mervis option */
++	if ((~descriptor->product_info.mervis_license.bitmask) != descriptor->product_info.mervis_license.bitmask_inverted) {
++		descriptor->product_info.mervis_license.bitmask = 0;
++		descriptor->product_info.mervis_license.bitmask_inverted = 0xff;
++	}
++	/* Fix platform */
++	if (descriptor->product_info.platform_id.raw_id == 0xffff) {
++		char firstch = descriptor->product_info.model_str[0];
++		char proc_ch = descriptor->product_info.model_str[3];
++		if ((firstch=='S')||(firstch=='M')||(firstch=='L')) {
++			if (proc_ch=='3')
++				descriptor->product_info.platform_id.parsed.platform_family = UNIEE_PLATFORM_FAMILY_NEURON;
++			else if (proc_ch=='5')
++				descriptor->product_info.platform_id.parsed.platform_family = UNIEE_PLATFORM_FAMILY_AXON;
++			else if (proc_ch=='7')
++				descriptor->product_info.platform_id.parsed.platform_family = UNIEE_PLATFORM_FAMILY_PATRON;
++		} else if ((firstch=='G')) {
++			descriptor->product_info.platform_id.parsed.platform_family = UNIEE_PLATFORM_FAMILY_G1XX;
++		}
++	} else if (descriptor->product_info.platform_id.raw_id == 0x0000) {
++		/* probably Unipi 1 */
++		if ((descriptor->product_info.product_version.major==1)
++			&& ((descriptor->product_info.product_version.minor==1)
++			  ||(descriptor->product_info.product_version.minor==0x11))) {
++			descriptor->product_info.platform_id.parsed.platform_family = UNIEE_PLATFORM_FAMILY_UNIPI1;
++			/* Fix AI1 AI2 calibration for unipi 1 */
++			memcpy(buff, &descriptor->product_info.sku, 2*sizeof(float));
++			descriptor->product_info.sku = 0xffffffff;
++			descriptor->board_info.specdata_headers_table[0].field_type = UNIEE_FIELD_TYPE_AICAL;
++			descriptor->board_info.specdata_headers_table[0].field_len = sizeof(float);
++			descriptor->board_info.specdata_headers_table[1].field_type = UNIEE_FIELD_TYPE_AICAL;
++			descriptor->board_info.specdata_headers_table[1].field_len = sizeof(float);
++		}
++	}
++	/* Fix rtc_calibration on old G1xx and Iris proto-motherboards */
++	if ((descriptor->board_info.specdata_headers_table[0].field_type < 4) &&
++	    (descriptor->board_info.specdata_headers_table[0].field_type != 0) &&
++	    (descriptor->board_info.specdata_headers_table[0].field_len == 0)) {
++		board_model_t rtc_cal = descriptor->board_info.board_model;
++		descriptor->board_info.board_model = descriptor->board_info.specdata_headers_table[0].field_type;
++		descriptor->board_info.specdata_headers_table[0].field_type = UNIEE_FIELD_TYPE_RTC;
++		descriptor->board_info.specdata_headers_table[0].field_len = sizeof(rtc_cal);
++		memcpy(buff, &rtc_cal, sizeof(rtc_cal));
++	}
++}
++
++
++#endif /* UNIEE_H_ */
+diff --git a/board/raspberrypi/rpi/uniee_values.h b/board/raspberrypi/rpi/uniee_values.h
+new file mode 100644
+index 00000000..51f3bb6a
+--- /dev/null
++++ b/board/raspberrypi/rpi/uniee_values.h
+@@ -0,0 +1,89 @@
++/******************************************************************
++ *
++ *  THIS FILE IS GENERATED FROM TEMPLATE. DON'T MODIFY IT
++ *
++ * uniee_values.h
++ *
++ *  Created on: Jan 14, 2022
++ *      Author: Miroslav Ondra <ondra@faster.cz>
++ * 
++ */
++
++#ifndef UNIEE_VALUES_H_
++#define UNIEE_VALUES_H_
++
++/* uniee_bank_3_t.platform_id */
++ #define UNIEE_PLATFORM_FAMILY_UNIPI1   0x01
++ #define UNIEE_PLATFORM_FAMILY_G1XX   0x02
++ #define UNIEE_PLATFORM_FAMILY_NEURON   0x03
++ #define UNIEE_PLATFORM_FAMILY_AXON   0x05
++ #define UNIEE_PLATFORM_FAMILY_PATRON   0x07
++ #define UNIEE_PLATFORM_FAMILY_IRIS   0x0f
++
++
++ #define UNIEE_PLATFORM_ID_G100   0x0002
++ #define UNIEE_PLATFORM_ID_G110   0x0102
++ #define UNIEE_PLATFORM_ID_IRISX1   0x010f
++ #define UNIEE_PLATFORM_ID_IRISX2   0x020f
++ #define UNIEE_PLATFORM_ID_IRISX5   0x030f
++ #define UNIEE_PLATFORM_ID_S103   0x0103
++ #define UNIEE_PLATFORM_ID_M103   0x0203
++ #define UNIEE_PLATFORM_ID_M203   0x0303
++ #define UNIEE_PLATFORM_ID_M303   0x0403
++ #define UNIEE_PLATFORM_ID_M523   0x0503
++ #define UNIEE_PLATFORM_ID_L203   0x0603
++ #define UNIEE_PLATFORM_ID_L403   0x0703
++ #define UNIEE_PLATFORM_ID_L523   0x0803
++ #define UNIEE_PLATFORM_ID_L533   0x0903
++ #define UNIEE_PLATFORM_ID_S107   0x0107
++ #define UNIEE_PLATFORM_ID_S207   0x0207
++ #define UNIEE_PLATFORM_ID_M207   0x0307
++ #define UNIEE_PLATFORM_ID_M527   0x0407
++ #define UNIEE_PLATFORM_ID_L207   0x0507
++ #define UNIEE_PLATFORM_ID_L527   0x0607
++
++
++/* uniee_bank_2_t.board_model */
++ #define UNIEE_BOARD_MODEL_G_1001_1	1
++ #define UNIEE_BOARD_MODEL_G_1002_1	2
++ #define UNIEE_BOARD_MODEL_IM_SPR485SD_1	3
++ #define UNIEE_BOARD_MODEL_I_GPRS	4
++ #define UNIEE_BOARD_MODEL_I_LTE	5
++ #define UNIEE_BOARD_MODEL_I_RS485	6
++ #define UNIEE_BOARD_MODEL_IC_DIS4_1	100
++ #define UNIEE_BOARD_MODEL_IC_LORANODE_1	101
++ #define UNIEE_BOARD_MODEL_IC_LIGHT1P_1	103
++ #define UNIEE_BOARD_MODEL_IC_AIF2AO1_1	104
++ #define UNIEE_BOARD_MODEL_IC_DIS2DO2_1	105
++ #define UNIEE_BOARD_MODEL_IC_R485X2R422_1	106
++ #define UNIEE_BOARD_MODEL_IC_AOU4_1	107
++ #define UNIEE_BOARD_MODEL_IC_AIUC8_1	108
++ #define UNIEE_BOARD_MODEL_IC_AIRTD8_1	109
++ #define UNIEE_BOARD_MODEL_IC_DIS8_1	110
++ #define UNIEE_BOARD_MODEL_IC_DO8_1	111
++ #define UNIEE_BOARD_MODEL_IC_CANFD_1	112
++ #define UNIEE_BOARD_MODEL_IC_ETH100_1	113
++ #define UNIEE_BOARD_MODEL_IC_R232X1_1	114
++ #define UNIEE_BOARD_MODEL_IC_USBSATA_1	115
++ #define UNIEE_BOARD_MODEL_ID_LTE_1	116
++ #define UNIEE_BOARD_MODEL_IC_GPS_1	117
++ #define UNIEE_BOARD_MODEL_IC_ACCGYRO_1	118
++
++
++/* specdata_header_t.field_type */
++ #define UNIEE_FIELD_TYPE_BUTTON	4
++ #define UNIEE_FIELD_TYPE_RTC	5
++ #define UNIEE_FIELD_TYPE_MAC	6
++ #define UNIEE_FIELD_TYPE_AICAL	7
++
++
++/* values of fields stored in uniee_bank_1_t.dummy_data */
++
++ #define UNIEE_FIELD_VALUE_BUTTON_PATRON	0
++ #define UNIEE_FIELD_VALUE_BUTTON_IRIS	1
++ #define UNIEE_FIELD_VALUE_BUTTON_NEURON	2
++ #define UNIEE_FIELD_VALUE_BUTTON_EDGE	3
++
++
++
++#endif
+\ No newline at end of file
+diff --git a/board/raspberrypi/rpi/unipi_eprom.c b/board/raspberrypi/rpi/unipi_eprom.c
+new file mode 100644
+index 00000000..994d4436
+--- /dev/null
++++ b/board/raspberrypi/rpi/unipi_eprom.c
+@@ -0,0 +1,143 @@
++/*
++ *
++ * Copyright (c) 2021  Faster CZ, ondra@faster.cz
++ *
++ * SPDX-License-Identifier: LGPL-2.1+
++ *
++ */
++
++#include <common.h>
++#include <miiphy.h>
++#include <netdev.h>
++//#include <asm/mach-imx/iomux-v3.h>
++#include <asm-generic/gpio.h>
++//#include <asm/arch/imx8mm_pins.h>
++//#include <asm/arch/clock.h>
++//#include <asm/arch/sys_proto.h>
++//#include <asm/mach-imx/gpio.h>
++//#include <asm/mach-imx/mxc_i2c.h>
++#include <i2c.h>
++#include <asm/io.h>
++#include <usb.h>
++#include <i2c_eeprom.h>
++#include <linux/delay.h>
++
++ #define htobe16(x) cpu_to_be16(x)
++
++#include "uniee.h"
++#include "uniee_values.h"
++#include "unipi_eprom.h"
++
++
++
++
++/*
++static void slotcp(u8* slot, int size, void* dest)
++{
++	const char* undef = "\xff\xff\xff\xff\xff\xff\xff\xff";
++	if (memcmp(undef, slot, size)!=0)
++		memcpy(dest, slot, size);
++}
++*/
++
++static void slotstr(u8* slot, int size, char* dest)
++{
++	int i;
++	char ch;
++	for (i=0; i<size; i++) {
++		dest[i] = ch = slot[i];
++		if (ch == 0xff || ch == '\0') {
++			dest[i] = '\0';
++			break;
++		}
++	}
++}
++
++
++/* 
++	Find property in memory block from Unipi Eprom
++	returns:
++			- pointer to data and length in len
++			- NULL if property not found or any error in structure
++*/
++#define specdata_count 12
++#define specdata_size  (2*UNIEE_BANK_SIZE)
++
++u8* unipi_eeprom_find_property(u8 *eprom, uniee_descriptor_area* descriptor, int property_type, int* len)
++{
++	int cur_type, i;
++	int dataindex = 0;
++
++	for (i=0; i < specdata_count; i++) {
++		cur_type = descriptor->board_info.specdata_headers_table[i].field_type |
++                   (((int)(descriptor->board_info.specdata_headers_table[i].field_len & (~0x3f)))<<2);
++		*len = descriptor->board_info.specdata_headers_table[i].field_len & (0x3f);
++		if ((dataindex + *len) >= specdata_size) 
++			return NULL;
++		if (cur_type == property_type) {
++			return eprom + dataindex;
++		}
++		dataindex += *len;
++	}
++	return NULL;
++}
++
++/* 
++	Find unsigned integer property in memory block from Unipi Eprom
++	returns:
++			- original length of property data (0-8) and uint value
++			- negative number if error
++*/
++int unipi_eeprom_get_uint_property(u8 *eprom, uniee_descriptor_area* descriptor, int property_type, unsigned long *value)
++{
++	int len;
++	u8* ptr = unipi_eeprom_find_property(eprom, descriptor, property_type, &len);
++	if (ptr == NULL) return -1;
++	if (len > sizeof(*value)) return -1;
++	*value = 0;
++	memcpy(value, ptr, len);
++	return len;
++}
++
++/* 
++	Find string property in memory block from Unipi Eprom
++	returns:
++			- original length of property data and null terminated str
++			- negative number if error
++*/
++int unipi_eeprom_get_str_property(u8 *eprom, uniee_descriptor_area* descriptor, int property_type, char* str, int maxlen)
++{
++	int len;
++	u8 *ptr = unipi_eeprom_find_property(eprom, descriptor, property_type, &len);
++
++	if (len < 0) return len;
++	if (len == 0) {
++		str[0] = '\0';
++	} else {
++		slotstr(ptr, min(len,maxlen-1), str);
++		str[min(len,maxlen-1)] = '\0';
++	}
++	return len;
++}
++
++
++u32 unipi_eeprom_get_serial(uniee_descriptor_area* descriptor)
++{
++	u32 serial = descriptor->product_info.product_serial;
++	if (serial == 0xffffffff) serial = 0;
++	return serial;
++}
++
++u32 unipi_eeprom_get_sku(uniee_descriptor_area* descriptor)
++{
++	u32 sku = descriptor->product_info.sku;
++	if (sku == 0xffffffff) sku = 0;
++	return sku;
++}
++
++void unipi_eeprom_get_model(uniee_descriptor_area* descriptor, char* str, int maxlen)
++{
++	int len = min((int) sizeof(descriptor->product_info.model_str), maxlen-1);
++	slotstr(descriptor->product_info.model_str, len, str);
++	str[len]= '\0';
++}
+diff --git a/board/raspberrypi/rpi/unipi_eprom.h b/board/raspberrypi/rpi/unipi_eprom.h
+new file mode 100644
+index 00000000..077ce308
+--- /dev/null
++++ b/board/raspberrypi/rpi/unipi_eprom.h
+@@ -0,0 +1,19 @@
++/*
++ *
++ * Copyright (c) 2021  Faster CZ, ondra@faster.cz
++ *
++ * SPDX-License-Identifier: LGPL-2.1+
++ *
++ */
++
++#ifndef UNIPI_EPROM_H_
++#define UNIPI_EPROM_H_
++
++#include "uniee.h"
++
++int unipi_eeprom_get_uint_property(u8 *eprom, uniee_descriptor_area* descriptor, int property_type, unsigned long *value);
++u32 unipi_eeprom_get_serial(uniee_descriptor_area* descriptor);
++u32 unipi_eeprom_get_sku(uniee_descriptor_area* descriptor);
++void unipi_eeprom_get_model(uniee_descriptor_area* descriptor, char* str, int maxlen);
++
++#endif /* UNIPI_EPROM_H_*/
+-- 
+2.39.2
+

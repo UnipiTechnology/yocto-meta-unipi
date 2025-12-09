@@ -1,0 +1,341 @@
+From e62af42f8ffdfc4cc957b203c551d2e12fc743f1 Mon Sep 17 00:00:00 2001
+From: Miroslav Ondra <ondra@faster.cz>
+Date: Mon, 16 Sep 2024 11:06:58 +0200
+Subject: [PATCH 10/14] Add new boot methods - altboot and tryboot
+
+---
+ boot/Kconfig            |  20 +++++
+ boot/Makefile           |   2 +
+ boot/bootmeth_altboot.c | 109 +++++++++++++++++++++++++++
+ boot/bootmeth_tryboot.c | 159 ++++++++++++++++++++++++++++++++++++++++
+ 4 files changed, 290 insertions(+)
+ create mode 100644 boot/bootmeth_altboot.c
+ create mode 100644 boot/bootmeth_tryboot.c
+
+diff --git a/boot/Kconfig b/boot/Kconfig
+index 4c9d2c0f..a7093426 100644
+--- a/boot/Kconfig
++++ b/boot/Kconfig
+@@ -719,6 +719,26 @@ config BOOTMETH_SCRIPT
+ 	  This provides a way to try out standard boot on an existing boot flow.
+ 	  It is not enabled by default to save space.
+ 
++if BOOTMETH_SCRIPT
++
++config BOOTMETH_TRYBOOT
++	bool "Bootdev support for one-shot boot from other location"
++	default y if BOOTMETH_SCRIPT
++	help
++	  Enables support for one-shot boot with support bootcount.
++	  Load /boot/tryboot file containing label of next bootdev (mmc0:3)
++	  and try to boot from this device. If boot/tryboot file is not
++	  found load and start /boot/recover.scr
++	  Before running an action bootcount is reset to disable repeated tryboot.
++
++config BOOTMETH_ALTBOOT
++	bool "Bootdev support for loading boot script from /boot/altboot directory
++	default y if BOOTMETH_SCRIPT
++	help
++	  Enable support for changing boot directory to /boot/altboot.
++
++
++endif # BOOTMETH_SCRIPT
+ endif # BOOTSTD
+ 
+ config LEGACY_IMAGE_FORMAT
+diff --git a/boot/Makefile b/boot/Makefile
+index 84ccfeae..8cf31a25 100644
+--- a/boot/Makefile
++++ b/boot/Makefile
+@@ -33,6 +33,8 @@ obj-$(CONFIG_$(SPL_TPL_)BOOTMETH_EFILOADER) += bootmeth_efi.o
+ obj-$(CONFIG_$(SPL_TPL_)BOOTMETH_CROS) += bootm.o bootm_os.o bootmeth_cros.o
+ obj-$(CONFIG_$(SPL_TPL_)BOOTMETH_SANDBOX) += bootmeth_sandbox.o
+ obj-$(CONFIG_$(SPL_TPL_)BOOTMETH_SCRIPT) += bootmeth_script.o
++obj-$(CONFIG_$(SPL_TPL_)BOOTMETH_TRYBOOT) += bootmeth_tryboot.o
++obj-$(CONFIG_$(SPL_TPL_)BOOTMETH_ALTBOOT) += bootmeth_altboot.o
+ obj-$(CONFIG_$(SPL_TPL_)CEDIT) += cedit.o
+ obj-$(CONFIG_$(SPL_TPL_)BOOTMETH_EFI_BOOTMGR) += bootmeth_efi_mgr.o
+ ifdef CONFIG_$(SPL_TPL_)BOOTSTD_FULL
+diff --git a/boot/bootmeth_altboot.c b/boot/bootmeth_altboot.c
+new file mode 100644
+index 00000000..9f3cc259
+--- /dev/null
++++ b/boot/bootmeth_altboot.c
+@@ -0,0 +1,109 @@
++// SPDX-License-Identifier: GPL-2.0+
++/*
++ * Bootmethod for booting via a U-Boot script loaded from /boot/altboot
++ *
++ * Copyright (C) 2024 Miroslav Ondra
++ * Author: Miroslav Ondra <ondra@unipi.technology>
++ *
++ * Based on bootmeth_script.c driver written by Simon Glass <sjg@chromium.org>
++ */
++
++#define LOG_CATEGORY UCLASS_BOOTSTD
++
++#include <common.h>
++#include <blk.h>
++#include <bootflow.h>
++#include <bootmeth.h>
++#include <bootstd.h>
++#include <dm.h>
++#include <env.h>
++#include <fs.h>
++#include <image.h>
++#include <malloc.h>
++#include <mapmem.h>
++#include <net.h>
++
++/* These are used if filename-prefixes */
++const char * alt_prefixes[] = {"/altboot/", "/boot/altboot/", NULL};
++
++static int altboot_check(struct udevice *dev, struct bootflow_iter *iter);
++
++static int altboot_read_bootflow(struct udevice *dev, struct bootflow *bflow)
++{
++	struct bootstd_priv * std_priv;
++	const char **old_prefixes;
++	int ret;
++	struct udevice *sdev;
++	const struct bootmeth_ops *sops;
++
++	ret = bootstd_get_priv(&std_priv);
++	if (ret)
++		return log_msg_ret("std", ret);
++	old_prefixes = std_priv->prefixes;
++	std_priv->prefixes = alt_prefixes;
++
++	ret = uclass_get_device_by_name(UCLASS_BOOTMETH, "script", &sdev);
++	if (ret) {
++		return log_msg_ret("script", -ENOTSUPP);
++	}
++	sops = bootmeth_get_ops(sdev);
++	ret = sops->read_bootflow(dev, bflow);
++	std_priv->prefixes = old_prefixes;
++	if (ret)
++		return log_msg_ret("blk", ret);
++
++	return 0;
++}
++
++
++static int altboot_bootmeth_bind(struct udevice *dev)
++{
++	struct bootmeth_uc_plat *plat = dev_get_uclass_plat(dev);
++
++	plat->desc = IS_ENABLED(CONFIG_BOOTSTD_FULL) ?
++		"Alternate boot from a block device" : "altboot";
++
++	return 0;
++}
++
++static struct bootmeth_ops altboot_bootmeth_ops = {
++	.check		= altboot_check,
++	.read_bootflow	= altboot_read_bootflow
++};
++
++static int altboot_check(struct udevice *dev, struct bootflow_iter *iter)
++{
++	//struct bootmeth_ops *ops = bootmeth_get_ops(dev);
++	struct udevice *sdev;
++	const struct bootmeth_ops *sops;
++	int ret;
++	/* This works on block devices, network devices and SPI Flash */
++	if (iter->method_flags & BOOTFLOW_METHF_PXE_ONLY)
++		return log_msg_ret("pxe", -ENOTSUPP);
++
++	ret = uclass_get_device_by_name(UCLASS_BOOTMETH, "script", &sdev);
++	if (ret) {
++		return log_msg_ret("altboot", -ENOTSUPP);
++	}
++	sops = bootmeth_get_ops(sdev);
++	altboot_bootmeth_ops.set_bootflow = sops->set_bootflow;
++	altboot_bootmeth_ops.read_file = sops->read_file;
++	altboot_bootmeth_ops.boot = sops->boot;
++	return 0;
++}
++
++
++
++static const struct udevice_id altboot_bootmeth_ids[] = {
++	{ .compatible = "u-boot,altboot" },
++	{ }
++};
++
++/* Put an number before 'altboot' to provide a default ordering */
++U_BOOT_DRIVER(bootmeth_5altboot) = {
++	.name		= "bootmeth_altboot",
++	.id		= UCLASS_BOOTMETH,
++	.of_match	= altboot_bootmeth_ids,
++	.ops		= &altboot_bootmeth_ops,
++	.bind		= altboot_bootmeth_bind,
++};
+diff --git a/boot/bootmeth_tryboot.c b/boot/bootmeth_tryboot.c
+new file mode 100644
+index 00000000..11aecd35
+--- /dev/null
++++ b/boot/bootmeth_tryboot.c
+@@ -0,0 +1,159 @@
++// SPDX-License-Identifier: GPL-2.0+
++/*
++ * Bootmethod for one-shot boot from other location
++ *
++ * Copyright (C) 2024 Miroslav Ondra
++ * Author: Miroslav Ondra <ondra@unipi.technology>
++ *
++ * Based on bootmeth_script.c driver written by Simon Glass <sjg@chromium.org>
++ */
++
++#define LOG_CATEGORY UCLASS_BOOTSTD
++
++#include <common.h>
++#include <blk.h>
++#include <bootflow.h>
++#include <bootmeth.h>
++#include <bootstd.h>
++#include <dm.h>
++#include <env.h>
++#include <fs.h>
++#include <image.h>
++#include <malloc.h>
++#include <mapmem.h>
++#include <net.h>
++#include <bootcount.h>
++#include <command.h>
++
++#define TRYBOOT_FNAME1	"tryboot"
++#define TRYBOOT_FNAME2	"recover.scr"
++
++static int tryboot_check(struct udevice *dev, struct bootflow_iter *iter)
++{
++	const struct udevice *media = dev_get_parent(iter->dev);
++	enum uclass_id id = device_get_uclass_id(media);
++	unsigned long bootcount = env_get_ulong("bootcount", 10, 0);
++
++	/* This only works on mmc devices */
++	if ((id != UCLASS_MMC) || (bootcount == 0))
++		return -ENOTSUPP;
++	return 0;
++}
++
++static int tryboot_read_bootflow(struct udevice *bootstd,
++				     struct bootflow *bflow)
++{
++	struct blk_desc *desc = NULL;
++	const char *const *prefixes;
++	const char *prefix;
++	int ret, i;
++
++	ret = uclass_first_device_err(UCLASS_BOOTSTD, &bootstd);
++	if (ret)
++		return log_msg_ret("std", ret);
++
++	if (bflow->blk) {
++		/* We require a partition table */
++		if (!bflow->part)
++			return -ENOENT;
++		 desc = dev_get_uclass_plat(bflow->blk);
++	}
++
++	prefixes = bootstd_get_prefixes(bootstd);
++	i = 0;
++	do {
++		prefix = prefixes ? prefixes[i] : NULL;
++
++		ret = bootmeth_try_file(bflow, desc, prefix, TRYBOOT_FNAME1);
++		if (ret) {
++			ret = bootmeth_try_file(bflow, desc, prefix,
++						TRYBOOT_FNAME2);
++		} else {
++			bflow->os_name = strdup("tryboot");
++		}
++	} while (ret && prefixes && prefixes[++i]);
++	if (ret)
++		return log_msg_ret("try", ret);
++
++	bflow->subdir = strdup(prefix ? prefix : "");
++	if (!bflow->subdir)
++		return log_msg_ret("prefix", -ENOMEM);
++
++	ret = bootmeth_alloc_file(bflow, 0x10000, ARCH_DMA_MINALIGN);
++	if (ret)
++		return log_msg_ret("read", ret);
++
++	return 0;
++}
++
++static int tryboot_set_bootflow(struct udevice *dev, struct bootflow *bflow,
++			       char *buf, int size)
++{
++	buf[size] = '\0';
++	bflow->buf = buf;
++	bflow->size = size;
++	bflow->state = BOOTFLOWST_READY;
++	return 0;
++}
++
++
++static int tryboot_boot(struct udevice *dev, struct bootflow *bflow)
++{
++	const struct bootmeth_ops *sops;
++	struct udevice *sdev;
++	int ret = 0;
++#if IS_ENABLED(CONFIG_BOOTCOUNT_LIMIT)
++	bootcount_store(0);
++	env_set("bootcount", "0");
++#endif
++	if (bflow->os_name && (strcmp(bflow->os_name, "tryboot")==0)) {
++		for(char* s=bflow->buf; *s != '\0'; ++s) {
++			if ((*s == '\n') || (*s == '\r')) {
++				*s = '\0';
++				break;
++			}
++		}
++		printf("TRYBOOT: %s\n", bflow->buf);
++		run_commandf("bootflow scan -b %s", bflow->buf);
++		do_reset(NULL, 0, 0, NULL);
++		return -1;
++	} else {
++		ret = uclass_get_device_by_name(UCLASS_BOOTMETH, "script", &sdev);
++		if (ret) {
++			return log_msg_ret("tryboot", -ENOTSUPP);
++		}
++		sops = bootmeth_get_ops(sdev);
++		return sops->boot(dev, bflow);
++	}
++}
++
++static int tryboot_bootmeth_bind(struct udevice *dev)
++{
++	struct bootmeth_uc_plat *plat = dev_get_uclass_plat(dev);
++
++	plat->desc = IS_ENABLED(CONFIG_BOOTSTD_FULL) ?
++		"Try boot from other partition" : "tryboot";
++
++	return 0;
++}
++
++static struct bootmeth_ops tryboot_bootmeth_ops = {
++	.check		= tryboot_check,
++	.read_bootflow	= tryboot_read_bootflow,
++	.set_bootflow	= tryboot_set_bootflow,
++	.read_file	= bootmeth_common_read_file,
++	.boot		= tryboot_boot,
++};
++
++static const struct udevice_id tryboot_bootmeth_ids[] = {
++	{ .compatible = "u-boot,tryboot" },
++	{ }
++};
++
++U_BOOT_DRIVER(bootmeth_tryboot) = {
++	.name		= "bootmeth_tryboot",
++	.id		= UCLASS_BOOTMETH,
++	.of_match	= tryboot_bootmeth_ids,
++	.ops		= &tryboot_bootmeth_ops,
++	.bind		= tryboot_bootmeth_bind,
++};
+-- 
+2.39.2
+

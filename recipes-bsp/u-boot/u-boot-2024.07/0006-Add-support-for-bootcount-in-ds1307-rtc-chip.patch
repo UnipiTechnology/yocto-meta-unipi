@@ -1,0 +1,53 @@
+From 687d45ade6ca2bcdcd2c5e448b78381f4593fdca Mon Sep 17 00:00:00 2001
+From: Miroslav Ondra <ondra@faster.cz>
+Date: Tue, 10 Sep 2024 21:57:33 +0200
+Subject: [PATCH 06/14] Add support for bootcount in ds1307 rtc chip
+
+---
+ drivers/rtc/ds1307.c | 23 +++++++++++++++++++++++
+ 1 file changed, 23 insertions(+)
+
+diff --git a/drivers/rtc/ds1307.c b/drivers/rtc/ds1307.c
+index 1d4e210f..2a1b61e8 100644
+--- a/drivers/rtc/ds1307.c
++++ b/drivers/rtc/ds1307.c
+@@ -224,6 +224,27 @@ static void rtc_write (uchar reg, uchar val)
+ #endif /* !CONFIG_DM_RTC */
+ 
+ #ifdef CONFIG_DM_RTC
++
++static int ds1307_rtc_read8(struct udevice *dev, unsigned int reg)
++{
++	int ret;
++	u8 buf;
++
++	ret = dm_i2c_read(dev, reg, &buf, sizeof(buf));
++
++	if (ret < 0)
++		return ret;
++
++	return buf;
++}
++
++static int ds1307_rtc_write8(struct udevice *dev, unsigned int reg, int val)
++{
++	u8 buf = (u8)val;
++	return dm_i2c_write(dev, reg, &buf, sizeof(buf));
++}
++
++
+ static int ds1307_rtc_set(struct udevice *dev, const struct rtc_time *tm)
+ {
+ 	int ret;
+@@ -350,6 +371,8 @@ static int ds1307_probe(struct udevice *dev)
+ static const struct rtc_ops ds1307_rtc_ops = {
+ 	.get = ds1307_rtc_get,
+ 	.set = ds1307_rtc_set,
++	.read8 = ds1307_rtc_read8,
++	.write8 = ds1307_rtc_write8,
+ 	.reset = ds1307_rtc_reset,
+ };
+ 
+-- 
+2.39.2
+
