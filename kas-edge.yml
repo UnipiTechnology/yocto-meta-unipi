@@ -74,7 +74,11 @@ local_conf_header:
     PATCHRESOLVE = "noop"
 
   debug-tweaks: |
-    #IMAGE_FEATURES += "empty-root-password allow-empty-password allow-root-login post-install-logging"
+    IMAGE_FEATURES += "empty-root-password allow-empty-password allow-root-login"
+    # mkpasswd -m sha256crypt <your-password>
+    # password: ppp
+    PASSWD = "\$5\$2qQtEpyiwk33Lj5/\$KK0mV7X4Mzt15EAo56iymdLUtL9Bbv0HWe8hpUZdhm1"
+    EXTRA_USERS_PARAMS = "usermod -p '${PASSWD}' root;"
 
   diskmon: |
     BB_DISKMON_DIRS = "\
@@ -105,18 +109,11 @@ local_conf_header:
     DISTRO_FEATURES:append = " security"
 
   no-dhcp: |
-    ## Toto nenainstaluje dhcpcd
+    ## Using systemd-networkd doesn't require dhcpcd
+    ## Don't install dhcpcd at all
     ## RDEPENDS:packagegroup-core-base-utils:remove = "dhcpcd"
-    ## Toto zakaze spusteni sluzby v systemd
+    ## Or disable starting dhcpcd as daemon via systemd
     SYSTEMD_AUTO_ENABLE:dhcpcd = "disable"
 
   e41x: |
     RPI_USE_U_BOOT = "1"
-    #U_BOOT_OVERLAYS = "unipi_e410 antenna1"
-    #DISABLE_VC4GRAPHICS = "0"
-    # unused in unipi layer (config.txt and build kernel)
-    #ENABLE_I2C = "0"
-    #DISABLE_OVERSCAN = "0"      # forced to 0 in config.txt
-    #DISABLE_SPLASH = "1"        # forced to 1 in config.txt
-    #ENABLE_UART = "1"           # must be enabled with u-boot
-    #DISABLE_RPI_BOOT_LOGO = "1" # not used  with u-boot

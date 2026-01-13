@@ -9,9 +9,6 @@ IMAGE_FSTYPES = "ext4 wic"
 IMAGE_OVERHEAD_FACTOR = "1.1"
 
 IMAGE_FEATURES:append = " package-management"
-IMAGE_FEATURES:append = " allow-root-login"
-IMAGE_FEATURES:append = " allow-empty-password"
-IMAGE_FEATURES:append = " empty-root-password"
 IMAGE_FEATURES:append = " ssh-server-openssh"
 
 IMAGE_INSTALL:append = " packagegroup-core-base-utils"
@@ -31,10 +28,6 @@ inherit core-image extrausers
 RDEPENDS:packagegroup-base:remove = "packagegroup-base-3g"
 RDEPENDS:packagegroup-base-extended:remove = "packagegroup-base-3g"
 
-
-# mkpasswd -m sha256crypt <your-password>
-# password: ppp
-PASSWD = "\$5\$2qQtEpyiwk33Lj5/\$KK0mV7X4Mzt15EAo56iymdLUtL9Bbv0HWe8hpUZdhm1"
-EXTRA_USERS_PARAMS = "\
-    usermod -p '${PASSWD}' root; \
-"
+#IMAGE_FEATURES:append = " allow-root-login"
+#IMAGE_FEATURES:append = " allow-empty-password"
+#IMAGE_FEATURES:append = " empty-root-password"
