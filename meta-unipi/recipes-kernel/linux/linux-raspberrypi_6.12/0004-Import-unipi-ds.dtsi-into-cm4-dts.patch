@@ -1,0 +1,22 @@
+From 57ed0c82aa6602377b62b6e45628e58f7b3eda66 Mon Sep 17 00:00:00 2001
+From: Miroslav Ondra <ondra@faster.cz>
+Date: Tue, 16 Dec 2025 02:45:27 +0100
+Subject: [PATCH] Import unipi-ds.dtsi into cm4 dts
+
+---
+ arch/arm/boot/dts/broadcom/bcm2711-rpi-cm4.dts | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/arch/arm/boot/dts/broadcom/bcm2711-rpi-cm4.dts b/arch/arm/boot/dts/broadcom/bcm2711-rpi-cm4.dts
+index c218f9cf823f..4c700d4b097e 100644
+--- a/arch/arm/boot/dts/broadcom/bcm2711-rpi-cm4.dts
++++ b/arch/arm/boot/dts/broadcom/bcm2711-rpi-cm4.dts
+@@ -495,3 +495,5 @@ __overrides__ {
+ 		pcie_tperst_clk_ms = <&pcie0>,"brcm,tperst-clk-ms:0";
+ 	};
+ };
++
++#include "unipi-ds.dtsi"
+-- 
+2.39.5
+

@@ -1,0 +1,5 @@
+
+Kernel FIT Image:
+
+https://docs.yoctoproject.org/ref-manual/classes.html#ref-classes-kernel-fit-image
+

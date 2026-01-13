@@ -1,0 +1,628 @@
+
+
+/dts-v1/;
+/plugin/;
+
+/{
+    
+	compatible = "brcm,bcm2711";
+
+	fragment@1 {
+		target = <&phy1>;
+		__overlay__ {
+			led-modes = <0x00 0x08>;
+		};
+	};
+
+	fragment@2 {
+		target = <&pcie0>;
+		__overlay__ {
+			status = "disabled";
+		};
+	};
+
+	fragment@3 {
+		target = <&ant1>;
+		__overlay__ {
+			status = "disabled";
+		};
+	};
+
+	fragment@4 {
+		target = <&ant2>;
+		__overlay__ {
+			status = "disabled";
+		};
+	};
+
+	fragment@5 {
+		target = <&expgpio>;
+		__overlay__ {
+			ant1alt: ant1alt-hog {
+				gpio-hog;
+				gpios = <3 0>; // GPIO_ACTIVE_HIGH
+				/* internal antenna disabled */
+				output-low;
+				line-name = "ant1";
+			};
+
+			ant2alt: ant2alt-hog {
+				gpio-hog;
+				gpios = <7 0>; // GPIO_ACTIVE_HIGH
+				/* external antenna enabled */
+				output-high;
+				line-name = "ant2";
+			};
+		};
+	};
+
+	fragment@6 {
+		target-path = "/";
+		__overlay__ {
+			chassis-type = "embedded";
+		};
+	};
+    fragment@10 {
+		target-path = "/";
+		__overlay__ {
+			model = "Unipi Edge E412";
+		};
+	};
+ 
+	fragment@51 {
+		target = <&spi6_cs_pins>;
+		__overlay__ {
+			brcm,pins = <18>, <23>;
+			brcm,function = <1>; // output input
+			brcm,pull = <0>, <0>;
+		};
+	};
+
+	fragment@52 {
+		target = <&spi6>;
+		__overlay__ {
+			// needed to avoid dtc warning
+			#address-cells = <1>;
+			#size-cells = <0>;
+			compatible = "brcm,bcm2835-spi";
+			pinctrl-names = "default";
+			pinctrl-0 = <&spi6_pins &spi6_cs_pins>;
+			cs-gpios = <&gpio 18 1>, <&gpio 23 1>;
+			dmas = <&dma 23>, <&dma 27>;
+			dma-names = "tx", "rx";
+			status = "okay";
+		};
+	};
+
+ 	fragment@101 {
+		target-path = "/aliases";
+		__overlay__ {
+			bluetooth = "/soc/serial@7e215040/bluetooth";
+		};
+	};
+
+	fragment@102 {
+		target = <&uart0>;
+		__overlay__ {
+			pinctrl-names = "default";
+			pinctrl-0 = <&uart0_ovl_pins>, <&uart0_rts_ovl_pins>;
+			status = "okay";
+			linux,rs485-enabled-at-boot-time;
+		};
+	};
+
+	fragment@103 {
+		target = <&gpio>;
+		__overlay__ {
+			uart0_ovl_pins: uart0-ovl-pins {
+				brcm,pins = <14 15>;
+				brcm,function = <4>; /* alt0 */
+				brcm,pull = <0 2>;
+			};
+			uart0_rts_ovl_pins: uart0-rts-ovl-pins {
+				brcm,pins = <17>;
+				brcm,function = <7>; /* alt3 */
+				brcm,pull = <0>;
+			};
+		};
+	};
+
+	fragment@104 {
+		target = <&bt>;
+		__overlay__ {
+			status = "disabled";
+		};
+	};
+
+	fragment@105 {
+		target = <&uart1>;
+		__overlay__ {
+			pinctrl-names = "default";
+			pinctrl-0 = <&uart1_bt_pins>;
+			status = "okay";
+		};
+	};
+
+	fragment@108 {
+		target = <&minibt>;
+		__overlay__ {
+			status = "okay";
+		};
+	};
+ 
+        fragment@150 {
+                target = <&uart2>;
+                __overlay__ {
+                        pinctrl-names = "default";
+                        pinctrl-0 = <&uart2_pins>, <&pinctrl_uart2_rts>;
+                        status = "okay";
+                        linux,rs485-enabled-at-boot-time;
+                        rts-gpios = <&gpio 16 0>; // GPIO_ACTIVE_HIGH
+                };
+        };
+
+        fragment@151 {
+                target = <&gpio>;
+                __overlay__ {
+                        pinctrl_uart2_rts: pinctrl-uart2-rts {
+                                brcm,pins = <16>;
+                                brcm,function = <1>; // out
+                                brcm,pull = <0>; // off
+                        };
+                };
+        };
+
+ 
+	fragment@201 {
+		target = <&spi6>;
+		__overlay__ {
+			// needed to avoid dtc warning
+			#address-cells = <1>;
+			#size-cells = <0>;
+
+			unipispi6_0: unipispi@0 {
+				compatible = "unipi,unipispi";
+				reg = <0>;
+				#address-cells = <1>;
+				#size-cells = <0>;
+				modbus-address = <1>;
+				spi-max-frequency = <6000000>;
+				status = "okay";
+
+				iogroup1: iogroup@1 {
+					compatible = "unipi,unipi-mfd", "iogroup";
+					reg = <1>;
+					board_name = "UDELAB0302";
+					fw_name = "UDELAB0302";
+					fw_variant = <0x3230>;
+					cycle_counter = <1019>;
+					master_watchdog_enable = <2>;
+					//interrupt-parent = <&gpio>;
+					//interrupts = <24 0x1>;     // IRQ_TYPE_EDGE_RISING
+					pinctrl-0 = <&pinctrl_stm32_irq>; 
+					pinctrl-names = "default";
+
+					di {
+						compatible = "unipi,gpio-di";
+						gpio-controller;
+						#gpio-cells = <2>;
+						gpio-line-names = "DI1", "DI2", "DI3", "DI4";
+						ngpio = <4>;
+						value-reg = <0>;
+						debounce-reg = <1010>;
+						counter-reg = <3>;
+					};
+					do {
+						compatible = "unipi,gpio-do";
+						ngpio = <2>;
+						value-coil = <0>;
+						gpio-controller;
+						#gpio-cells = <2>;
+						gpio-line-names = "DO1", "DO2";
+					};
+				};
+			};
+		};
+	};
+
+	fragment@202 {
+		target = <&gpio>;
+		__overlay__ {
+			pinctrl_stm32_irq: pinctrl-stm32-irq {
+				brcm,pins = <24>;
+				brcm,function = <0>; // in
+				brcm,pull = <1>;     // on
+			};
+		};
+	};
+
+ 
+        fragment@300 {
+                target = <&spi4>;
+                __overlay__ {
+                        status = "okay";
+                        pinctrl-names = "default";
+                        pinctrl-0 = <&spi4_pins &spi4_cs_pins>;
+                        cs-gpios = <&gpio 4 1>;
+                        #address-cells = <1>;
+                        #size-cells = <0>;
+                        dmas = <&dmamux 19 1>, <&dmamux 20 1>;
+                        dma-names = "tx", "rx";
+
+                        fram0: eeprom@0 {
+                            compatible = "fujitsu,mb85rs1mt", "atmel,at25";
+                            reg = <0>;
+                            spi-max-frequency = <30000000>;
+                            pagesize = <4096>;
+                            size = <131072>;
+                            address-width = <24>;
+                        };
+                };
+        };
+
+        fragment@301 {
+                target = <&spi4_cs_pins>;
+                __overlay__ {
+                        brcm,pins = <4>;
+                        brcm,function = <1>; //<BCM2835_FSEL_GPIO_OUT>;
+                };
+        };
+
+ 
+	fragment@400 {
+		target = <&xhci>;
+		__overlay__ {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			smsc-hub@1 {
+				reg = <1>;
+				compatible = "usb0424,9514";
+				#address-cells = <1>;
+				#size-cells = <0>;
+				ethernet1:eth1@1 {
+					reg = <1>;
+					compatible = "usb0424,ec00";
+				};
+				mpcie:mpcie@2 {
+					reg = <2>;
+				};
+			};
+		};
+	}; 
+
+	fragment@401 {
+		target-path = "/aliases";
+		__overlay__ {
+			// Must be defined absolutly - Tady je problem v ruznuch nazvech usb/xhci v DT mainline/rpi
+			//ethernet1 = "/scb/usb@7e9c0000/smsc-hub@1/eth1@1";
+			ethernet1 = "/scb/xhci@7e9c0000/smsc-hub@1/eth1@1";
+		};
+	};
+
+	fragment@403 {
+		target-path = "/";
+		__overlay__ {
+			lte_kill{
+				compatible = "unipi,rfkill-level";
+				type = "wwan";
+				algo = "pulse";
+				rfkill-gpio = <&gpio 44 1>;
+				monitor-usb = <&mpcie>;
+				pinctrl-names = "default";
+				pinctrl-0 = <&pinctrl_lte_reset>;
+			};
+		};
+	}; 
+
+	fragment@404 {
+		target = <&gpio>;
+		__overlay__ {
+			pinctrl_lte_reset: pinctrl-lte-reset {
+				brcm,pins = <44>;
+				brcm,function = <1>; // out
+				brcm,pull = <0>; // off
+			};
+		};
+	};
+         fragment@500 {
+                target = <&i2c1>;
+                __overlay__ {
+                        #address-cells = <0x01>;
+                        #size-cells = <0x00>;
+                        status = "okay";
+                        //clock-frequency = <400000>;  // Set I2C1 frequency to 400 kHz
+
+                        temp1: temp1@48 {
+                                #thermal-sensor-cells = <0>;
+                                compatible = "ti,tmp1075";
+                                reg = <0x48>;
+                                status = "okay";
+                                thermal-zones = <&pcb_thermal>;
+                                vs-supply = <&vdd3v3_reg>;
+                        };
+                        temp2: temp2@49 {
+                                #thermal-sensor-cells = <0>;
+                                compatible = "ti,tmp1075";
+                                reg = <0x49>;
+                                status = "okay";
+                                thermal-zones = <&smps_thermal>;
+                                vs-supply = <&vdd3v3_reg>;
+                        };
+                };
+        };
+
+        fragment@501 {
+                target-path = "/";
+                __overlay__ {
+                        thermal-zones {
+                                pcb_thermal: pcb-thermal {
+                                        polling-delay-passive = <250>; /* milliseconds */
+                                        polling-delay = <1000>; /* milliseconds */
+                                        /* sensor       ID */
+                                        thermal-sensors = <&temp1>;
+                                        trips {
+                                                pcb_hot: trip-point0 {
+                                                        temperature = <50000>;  /* 70  C trip point */
+                                                        hysteresis = <5000>;  /* 5  C hysteresis */
+                                                        type = "hot";
+                                                };
+                                                pcb_overheat: trip-point1 {
+                                                        temperature = <490000>;  /* 70  C trip point */
+                                                        hysteresis = <5000>;  /* 5  C hysteresis */
+                                                        type = "critical";
+                                                };
+                                        };
+                                };
+                                smps_thermal: smps-thermal {
+                                        polling-delay-passive = <250>; /* milliseconds */
+                                        polling-delay = <1000>; /* milliseconds */
+                                        /* sensor       ID */
+                                        thermal-sensors = <&temp2>;
+                                        trips {
+                                                smps_overheat1: trip-point0 {
+                                                        temperature = <60000>;  /* 70  C trip point */
+                                                        hysteresis = <2000>;  /* 5  C hysteresis */
+                                                        type = "active";
+                                                };
+                                                smps_overheat2: trip-point1 {
+                                                        temperature = <65000>;  /* 70  C trip point */
+                                                        hysteresis = <2000>;  /* 5  C hysteresis */
+                                                        type = "passive";
+                                                };
+                                                smps_overheat3: trip-point2 {
+                                                        temperature = <70000>;  /* 70  C trip point */
+                                                        hysteresis = <2000>;  /* 5  C hysteresis */
+                                                        type = "hot";
+                                                };
+                                                smps_hot: trip-point3 {
+                                                        temperature = <495000>;  /* 70  C trip point */
+                                                        hysteresis = <5000>;  /* 5  C hysteresis */
+                                                        type = "critical";
+                                                };
+
+                                        };
+                                };
+                        };
+                };
+        };
+ 	fragment@600 {
+		target-path = "/";
+		__overlay__ {
+
+
+			gpio_keys: gpio-keys {
+				compatible = "gpio-keys";
+				pinctrl-names = "default";
+				pinctrl-0 = <&pinctrl_service_button>;
+				label = "Service Button";
+
+				button {
+					label = "Service Button";
+					gpios = <&gpio 25 0>; /* ACTIVE_HIGH */
+					linux,code = <28>; /* KEY_ENTER */
+					debounce-interval = <50>;
+				};
+			};
+
+
+		};
+	};
+
+	fragment@601 {
+		target = <&gpio>;
+		__overlay__ {
+                        pinctrl_service_button: pinctrl-service-button {
+				brcm,pins = <25>;
+				brcm,function = <0>; /* input */
+			};
+		};
+	};
+ 
+	fragment@701 {
+		target = <&gpio>;
+		__overlay__ {
+			wd_pins: wd-pins {
+				brcm,pins = <27>;
+				brcm,function = <1>; /* output */
+			};
+			reset_pins: reset-pins {
+				brcm,pins = <26>;
+				brcm,function = <1>; /* output */
+			};
+		};
+	};
+
+	fragment@702 {
+		target-path = "/";
+		__overlay__ {
+			wdt_gpio: wdt-gpio {
+				compatible = "linux,wdt-gpio";
+				//always-running;
+				hw_margin_ms = <4000>;
+				hw_algo = "level";
+				pinctrl-names = "default";
+                                timeout-sec = <10>;
+				pinctrl-0 = <&wd_pins>;
+				gpios = <&gpio 27 0>;
+				status = "okay";
+			};
+			gpio_restart: gpio-restart {
+				compatible = "gpio-restart";
+				open-source;
+				gpios = <&gpio 26 0>;
+				priority = <255>; /* <128> or <255> */
+				active-delay = <100>;
+				inactive-delay = <100>;
+				wait-delay = <3000>;
+				pinctrl-names = "default";
+				pinctrl-0 = <&reset_pins>;
+				status = "okay";
+			};
+
+			/* Regulator node to avoid "dummy regulator" messages */
+			vdd3v3_reg: regulator-vdd {
+				compatible = "regulator-fixed";
+				regulator-name = "vdd3v3_reg";
+				regulator-min-microvolt = <3300000>;
+				regulator-max-microvolt = <3300000>;
+			};
+		};
+	};
+	fragment@703 {
+		target-path = "/aliases";
+		__overlay__ {
+			watchdog1 = "/wdt-gpio";
+		};
+	};
+ 
+	fragment@801 {
+		target = <&spi6>;
+		__overlay__ {
+			// needed to avoid dtc warning
+			#address-cells = <1>;
+			#size-cells = <0>;
+
+			tpm_spi: tpm-spi@1 {
+				compatible = "infineon,slb9670";
+				reg = <1>;
+				#address-cells = <1>;
+				#size-cells = <0>;
+				interrupt-parent = <&gpio>;
+				//interrupts = <45 0x2>;     // IRQ_TYPE_EDGE_FALLING
+				interrupts = <45 0x8>;     // IRQ_TYPE_LEVEL_LOW
+				spi-max-frequency = <33000000>;
+				status = "okay";
+			};
+		};
+	};
+
+	fragment@802 {
+		target = <&gpio>;
+		__overlay__ {
+			pinctrl_tpm_irq: pinctrl-tpm-irq {
+				brcm,pins = <45>;
+				brcm,function = <0>; // BCM2835_FSEL_GPIO_IN
+				brcm,pull = <2>;     // BCM2835_PUD_UP
+			};
+		};
+	};
+ 
+	fragment@901 {
+		target = <&i2c1>;
+		__overlay__ {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			uleds_gpio: pca9505@20 {
+				compatible = "nxp,pca9505";
+				reg = <0x20>;
+				gpio-controller;
+				#gpio-cells = <2>;
+				vcc-supply = <&vdd3v3_reg>;
+
+				reserved {
+					gpio-hog;
+					gpios = <14 0>, <15 0>, <16 0>,
+					        <17 0>, <18 0>, <19 0>, <20 0>,
+					        <21 0>, <22 0>, <23 0>,
+					        <25 0>, <26 0>, <27 0>, <28 0>,
+					        <29 0>, <30 0>, <31 0>;
+					input;
+				};
+			};
+		};
+	};
+
+	fragment@902 {
+		target-path = "/";
+		__overlay__ {
+			sysled:sysled {
+				compatible = "gpio-leds";
+				act-led {
+					gpios = <&uleds_gpio 0 1>;
+					default-state = "off";
+					linux,default-trigger = "heartbeat";
+				};
+				rs485_1_txled: rs485-1-txled {
+					gpios = <&uleds_gpio 1 1>;
+					default-state = "off";
+					linux,default-trigger = "tty";
+				};
+				rs485_1_rxled: rs485-1-rxled {
+					gpios = <&uleds_gpio 2 1>;
+					default-state = "off";
+					linux,default-trigger = "tty";
+				};
+				rs485_2_txled: rs485-2-txled {
+					gpios = <&uleds_gpio 3 1>;
+					default-state = "off";
+					linux,default-trigger = "tty";
+				};
+				rs485_2_rxled: rs485-2-rxled {
+					gpios = <&uleds_gpio 4 1>;
+					default-state = "off";
+					linux,default-trigger = "tty";
+				};
+				wifi_led: wifi-led {
+					gpios = <&uleds_gpio 5 1>;
+					linux,default-trigger = "netdev";
+				};
+				sim_led: sim-led {
+					gpios = <&uleds_gpio 6 1>;
+					default-state = "off";
+				};
+				net_led: net-led {
+					gpios = <&uleds_gpio 7 1>;
+					default-state = "off";
+				};
+				sig_led: sig-led {
+					gpios = <&uleds_gpio 8 1>;
+					default-state = "off";
+				};
+				int_led: int-led {
+					gpios = <&uleds_gpio 9 1>;
+					default-state = "off";
+				};
+				x1_led: x1-led {
+					gpios = <&uleds_gpio 10 1>;
+					default-state = "off";
+				};
+				x2_led: x2-led {
+					gpios = <&uleds_gpio 11 1>;
+					default-state = "off";
+				};
+				x3_led: x3-led {
+					gpios = <&uleds_gpio 12 1>;
+					default-state = "off";
+				};
+				x4_led: x4-led {
+					gpios = <&uleds_gpio 13 1>;
+					default-state = "off";
+				};
+			};
+		};
+	};
+};
+
+
+
+/delete-node/ &x4_led;

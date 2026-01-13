@@ -1,0 +1,144 @@
+/dts-v1/;
+/plugin/;
+
+/{
+	compatible = "brcm,bcm2711";
+
+	 
+	fragment@51 {
+		target = <&spi6_cs_pins>;
+		__overlay__ {
+			brcm,pins = <18>, <23>;
+			brcm,function = <1>; // output input
+			brcm,pull = <0>, <0>;
+		};
+	};
+
+	fragment@52 {
+		target = <&spi6>;
+		__overlay__ {
+			// needed to avoid dtc warning
+			#address-cells = <1>;
+			#size-cells = <0>;
+			compatible = "brcm,bcm2835-spi";
+			pinctrl-names = "default";
+			pinctrl-0 = <&spi6_pins &spi6_cs_pins>;
+			cs-gpios = <&gpio 18 1>, <&gpio 23 1>;
+			dmas = <&dma 23>, <&dma 27>;
+			dma-names = "tx", "rx";
+			status = "okay";
+		};
+	};
+
+	 	fragment@101 {
+		target-path = "/aliases";
+		__overlay__ {
+			bluetooth = "/soc/serial@7e215040/bluetooth";
+		};
+	};
+
+	fragment@102 {
+		target = <&uart0>;
+		__overlay__ {
+			pinctrl-names = "default";
+			pinctrl-0 = <&uart0_ovl_pins>, <&uart0_rts_ovl_pins>;
+			status = "okay";
+			linux,rs485-enabled-at-boot-time;
+		};
+	};
+
+	fragment@103 {
+		target = <&gpio>;
+		__overlay__ {
+			uart0_ovl_pins: uart0-ovl-pins {
+				brcm,pins = <14 15>;
+				brcm,function = <4>; /* alt0 */
+				brcm,pull = <0 2>;
+			};
+			uart0_rts_ovl_pins: uart0-rts-ovl-pins {
+				brcm,pins = <17>;
+				brcm,function = <7>; /* alt3 */
+				brcm,pull = <0>;
+			};
+		};
+	};
+
+	fragment@104 {
+		target = <&bt>;
+		__overlay__ {
+			status = "disabled";
+		};
+	};
+
+	fragment@105 {
+		target = <&uart1>;
+		__overlay__ {
+			pinctrl-names = "default";
+			pinctrl-0 = <&uart1_bt_pins>;
+			status = "okay";
+		};
+	};
+
+	fragment@108 {
+		target = <&minibt>;
+		__overlay__ {
+			status = "okay";
+		};
+	};
+	 
+	fragment@400 {
+		target = <&xhci>;
+		__overlay__ {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			smsc-hub@1 {
+				reg = <1>;
+				compatible = "usb0424,9514";
+				#address-cells = <1>;
+				#size-cells = <0>;
+				ethernet1:eth1@1 {
+					reg = <1>;
+					compatible = "usb0424,ec00";
+				};
+				mpcie:mpcie@2 {
+					reg = <2>;
+				};
+			};
+		};
+	}; 
+
+	fragment@401 {
+		target-path = "/aliases";
+		__overlay__ {
+			// Must be defined absolutly - Tady je problem v ruznuch nazvech usb/xhci v DT mainline/rpi
+			//ethernet1 = "/scb/usb@7e9c0000/smsc-hub@1/eth1@1";
+			ethernet1 = "/scb/xhci@7e9c0000/smsc-hub@1/eth1@1";
+		};
+	};
+
+	fragment@403 {
+		target-path = "/";
+		__overlay__ {
+			lte_kill{
+				compatible = "unipi,rfkill-level";
+				type = "wwan";
+				algo = "pulse";
+				rfkill-gpio = <&gpio 44 1>;
+				monitor-usb = <&mpcie>;
+				pinctrl-names = "default";
+				pinctrl-0 = <&pinctrl_lte_reset>;
+			};
+		};
+	}; 
+
+	fragment@404 {
+		target = <&gpio>;
+		__overlay__ {
+			pinctrl_lte_reset: pinctrl-lte-reset {
+				brcm,pins = <44>;
+				brcm,function = <1>; // out
+				brcm,pull = <0>; // off
+			};
+		};
+	};
+};

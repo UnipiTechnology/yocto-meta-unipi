@@ -1,0 +1,18 @@
+
+// =============================================
+// Downstream rpi- changes
+
+&scb {
+	udma-ranges = <0x0 0x00000000  0x0 0x00000000  0x4 0x00000000>;
+};
+
+&soc {
+	dmamux: dma-mux@7e204e00 {
+		#address-cells = <1>;
+		#size-cells = <0>;
+		compatible = "brcm,bcm2835-dmamux";
+		reg = <0x7e204e00 0x4>;
+		#dma-cells = <2>;
+		dma-masters = <&dma>;
+	};
+};

@@ -1,0 +1,99 @@
+From db4953be3a93abb27c1bf68ba248f232bb61fda5 Mon Sep 17 00:00:00 2001
+From: Miroslav Ondra <ondra@faster.cz>
+Date: Thu, 15 May 2025 01:48:28 +0200
+Subject: [PATCH 3/3] serial: amba-pl011: Add mctrl_gpio
+
+---
+ drivers/tty/serial/amba-pl011.c | 30 ++++++++++++++++++++++++++----
+ 1 file changed, 26 insertions(+), 4 deletions(-)
+
+diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
+index 757373dbc..d2075c484 100644
+--- a/drivers/tty/serial/amba-pl011.c
++++ b/drivers/tty/serial/amba-pl011.c
+@@ -41,6 +41,7 @@
+ #include <linux/sizes.h>
+ #include <linux/io.h>
+ #include <linux/acpi.h>
++#include "serial_mctrl_gpio.h"
+ 
+ #define UART_NR			14
+ 
+@@ -286,6 +287,7 @@ struct uart_amba_port {
+ 	enum pl011_rs485_tx_state	rs485_tx_state;
+ 	struct hrtimer		trigger_start_tx;
+ 	struct hrtimer		trigger_stop_tx;
++	struct mctrl_gpios	*gpios;
+ #ifdef CONFIG_DMA_ENGINE
+ 	/* DMA stuff */
+ 	unsigned int		dmacr;		/* dma control reg */
+@@ -1317,10 +1319,13 @@ static void pl011_rs485_tx_stop(struct uart_amba_port *uap)
+ 
+ 	cr = pl011_read(uap, REG_CR);
+ 
+-	if (port->rs485.flags & SER_RS485_RTS_AFTER_SEND)
++	if (port->rs485.flags & SER_RS485_RTS_AFTER_SEND) {
++		mctrl_gpio_set(uap->gpios, uap->port.mctrl | TIOCM_RTS);
+ 		cr &= ~UART011_CR_RTS;
+-	else
++	} else {
++		mctrl_gpio_set(uap->gpios, uap->port.mctrl & ~TIOCM_RTS);
+ 		cr |= UART011_CR_RTS;
++	}
+ 
+ 	/* Disable the transmitter and reenable the transceiver */
+ 	cr &= ~UART011_CR_TXE;
+@@ -1383,10 +1388,13 @@ static void pl011_rs485_tx_start(struct uart_amba_port *uap)
+ 	if (!(port->rs485.flags & SER_RS485_RX_DURING_TX))
+ 		cr &= ~UART011_CR_RXE;
+ 
+-	if (port->rs485.flags & SER_RS485_RTS_ON_SEND)
++	if (port->rs485.flags & SER_RS485_RTS_ON_SEND) {
++		mctrl_gpio_set(uap->gpios, uap->port.mctrl | TIOCM_RTS);
+ 		cr &= ~UART011_CR_RTS;
+-	else
++	} else {
++		mctrl_gpio_set(uap->gpios, uap->port.mctrl & ~TIOCM_RTS);
+ 		cr |= UART011_CR_RTS;
++	}
+ 
+ 	pl011_write(cr, uap, REG_CR);
+ 
+@@ -1714,6 +1722,7 @@ static void pl011_set_mctrl(struct uart_port *port, unsigned int mctrl)
+ 	}
+ 
+ 	pl011_write(cr, uap, REG_CR);
++	mctrl_gpio_set(uap->gpios, mctrl);
+ }
+ 
+ static void pl011_break_ctl(struct uart_port *port, int break_state)
+@@ -2319,6 +2328,15 @@ static int pl011_rs485_config(struct uart_port *port, struct ktermios *termios,
+ 		u32 cr = pl011_read(uap, REG_CR);
+ 
+ 		cr &= ~UART011_CR_RTSEN;
++
++		if (rs485->flags & SER_RS485_RTS_AFTER_SEND) {
++			mctrl_gpio_set(uap->gpios, uap->port.mctrl | TIOCM_RTS);
++			cr &= ~UART011_CR_RTS;
++		} else if (rs485->flags & SER_RS485_RTS_ON_SEND) {
++			mctrl_gpio_set(uap->gpios, uap->port.mctrl & ~TIOCM_RTS);
++			cr |= UART011_CR_RTS;
++		}
++
+ 		pl011_write(cr, uap, REG_CR);
+ 		port->status &= ~UPSTAT_AUTORTS;
+ 	}
+@@ -2908,6 +2926,10 @@ static int pl011_probe(struct amba_device *dev, const struct amba_id *id)
+ 	if (ret)
+ 		return ret;
+ 
++	uap->gpios = mctrl_gpio_init(&uap->port, 0);
++	if (IS_ERR(uap->gpios))
++		return PTR_ERR(uap->gpios);
++
+ 	amba_set_drvdata(dev, uap);
+ 
+ 	return pl011_register_port(uap);
+-- 
+2.39.5
+

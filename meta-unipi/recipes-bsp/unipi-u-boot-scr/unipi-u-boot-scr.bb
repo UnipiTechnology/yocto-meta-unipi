@@ -1,0 +1,40 @@
+SUMMARY = "U-boot boot scripts for Unipi Edge"
+LICENSE = "MIT"
+LIC_FILES_CHKSUM = "file://${COMMON_LICENSE_DIR}/MIT;md5=0835ade698e0bcf8506ecda2f7b4f302"
+COMPATIBLE_MACHINE = "unipi-edge"
+
+DEPENDS = "u-boot-mkimage-native"
+
+#INHIBIT_DEFAULT_DEPS = "1"
+
+SRC_URI = "file://boot.cmd.in"
+
+BOOT_MEDIA ?= "mmc"
+
+do_compile() {
+    sed -e 's/@@KERNEL_IMAGETYPE@@/${KERNEL_IMAGETYPE}/' \
+        -e 's/@@KERNEL_BOOTCMD@@/${KERNEL_BOOTCMD}/' \
+        -e 's/@@U_BOOT_OVERLAYS@@/${U_BOOT_OVERLAYS}/' \
+        -e 's/@@BOOT_MEDIA@@/${BOOT_MEDIA}/' \
+        "${WORKDIR}/boot.cmd.in" > "${WORKDIR}/boot.cmd"
+    mkimage -A ${UBOOT_ARCH} -T script -C none -n "Boot script" -d "${WORKDIR}/boot.cmd" boot.scr
+}
+
+inherit kernel-arch
+
+do_install() {
+    install -d ${D}/boot
+    install -m 0755 boot.scr ${D}/boot
+}
+
+do_deploy() {
+    :
+}
+
+addtask do_deploy after do_compile before do_build
+
+FILES:${PN} = "/boot/boot.scr"
+
+PROVIDES += "u-boot-default-script"
+RPROVIDES:${PN} += "u-boot-default-script"
+
