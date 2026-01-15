@@ -11,7 +11,7 @@ SRC_URI = "git://source.denx.de/u-boot/u-boot.git;protocol=https;branch=master \
  file://0006-Add-Unipi-board-files.patch \
 "
 
-DEPENDS += "bc-native dtc-native python3-pyelftools-native gnutls"
+DEPENDS += "bc-native dtc-native python3-pyelftools-native gnutls-native"
 COMPATIBLE_MACHINE = "unipi-edge"
 RDEPENDS:${PN} += "u-boot-default-script"
 
