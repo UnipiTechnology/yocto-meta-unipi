@@ -12,15 +12,13 @@ SRC_URI = "git://git.unipi.technology/UniPi/unipi-lte;branch=main-trixie;protoco
 
 S = "${WORKDIR}/git"
 
-inherit systemd
+inherit features_check systemd
 
-do_configure() {
-    :
-}
+REQUIRED_DISTRO_FEATURES = "systemd"
 
-do_compile() {
-    :
-}
+# Nothing to build, just a python script to install
+do_configure[noexec] = "1"
+do_compile[noexec] = "1"
 
 do_install() {
     install -m 755 -d ${D}${sbindir}
