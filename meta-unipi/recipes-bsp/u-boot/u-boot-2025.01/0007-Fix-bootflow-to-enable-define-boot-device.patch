@@ -1,0 +1,27 @@
+From 17a91e3ec3ac55fb8270e3ece559fd288bbe1bfe Mon Sep 17 00:00:00 2001
+From: Miroslav Ondra <ondra@faster.cz>
+Date: Tue, 20 May 2025 14:43:05 +0200
+Subject: [PATCH] Fix bootflow to enable define boot device
+
+---
+ boot/bootflow.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/boot/bootflow.c b/boot/bootflow.c
+index d8807eb1..32eb6a67 100644
+--- a/boot/bootflow.c
++++ b/boot/bootflow.c
+@@ -383,8 +383,8 @@ int bootflow_scan_first(struct udevice *dev, const char *label,
+ {
+	int ret;
+ 
+-	if (dev || label)
+-		flags |= BOOTFLOWIF_SKIP_GLOBAL;
++//	if (dev || label)
++//		flags |= BOOTFLOWIF_SKIP_GLOBAL;
+	bootflow_iter_init(iter, flags);
+ 
+	/*
+-- 
+2.39.5
+

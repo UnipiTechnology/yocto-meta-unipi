@@ -9,6 +9,7 @@ SRC_URI = "git://source.denx.de/u-boot/u-boot.git;protocol=https;branch=master \
  file://0004-Add-support-for-RS485-console.patch \
  file://0005-Add-new-boot-methods-altboot-and-tryboot.patch \
  file://0006-Add-Unipi-board-files.patch \
+ file://0007-Fix-bootflow-to-enable-define-boot-device.patch \
 "
 
 DEPENDS += "bc-native dtc-native python3-pyelftools-native gnutls-native"
