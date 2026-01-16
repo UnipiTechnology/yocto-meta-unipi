@@ -1,30 +1,25 @@
-diff --git a/Makefile b/Makefile
-index 4ceaf35..80c51d5 100644
---- a/src/Makefile
-+++ b/src/Makefile
-@@ -17,9 +17,9 @@
+diff --git a/src/Makefile b/src/Makefile
+index 900df6f..0654add 100644
+--- a/Makefile
++++ b/Makefile
+@@ -17,9 +17,6 @@
  ##############################################################################################
  # Start of default section
  #
 -CC   = $(CCPREFIX)gcc
 -CP   = $(CCPREFIX)objcopy
 -AS   = $(CCPREFIX)gcc -x assembler-with-cpp
-+#CC   = $(CCPREFIX)gcc
-+#CP   = $(CCPREFIX)objcopy
-+#AS   = $(CCPREFIX)gcc -x assembler-with-cpp
  INSTALL=install
  
  ifdef PROJECT_VERSION
-@@ -37,24 +37,24 @@ SHFILES = os-configurator reconfigure-net
+@@ -37,24 +34,18 @@ PY_FILES = os-configurator.py
  # Define optimisation level here
  #OPT = -Ofast # Very aggressive
  #OPT = -Os # For size
 -OPT = -O2 # Medium
-+#OPT = -O2 # Medium
  
  # Define debug level here
 -DBG = -g0 # No debug
-+#DBG = -g0 # No debug
  #DBG = -g # Medium debug
  #DBG = -g2 # All debug symbols 
  
@@ -33,42 +28,12 @@ index 4ceaf35..80c51d5 100644
  INCDIR  = $(patsubst %,-I%, $(INCDIRS))
 -LIBDIR  = $(patsubst %,-L%, $(LIBDIRS))
 -LIB     = $(patsubst %,-l%, $(LIBS))
-+#LIBDIR  = $(patsubst %,-L%, $(LIBDIRS))
-+#LIB     = $(patsubst %,-l%, $(LIBS))
  
  #OBJS  = $(SRC:.c=.o)
  
 -LDFLAGS = $(LIBDIR) $(LIB)
-+#LDFLAGS = $(LIBDIR) $(LIB)
  #CPFLAGS = -g -fomit-frame-pointer -Wall -Wstrict-prototypes -fverbose-asm 
 -CPFLAGS = -Wall -Wstrict-prototypes $(OPT) $(DBG)
-+#CPFLAGS = -Wall -Wstrict-prototypes $(OPT) $(DBG)
  
  #
  # makefile rules
-@@ -65,14 +65,14 @@ all: $(BINFILES) $(PYFILES)
- 	$(CC) -c $(CPFLAGS) $(LDFLAGS) -I . $(INCDIR) $(PROJECT_VERSION) $< -o $@
- 
- sw_485: sw_485.o
--	$(CC) $< -o $@
-+	$(CC) $< $(LDFLAGS) -o $@
- 
- unipiid:  unipiid.o unipiutil.o
--	$(CC) unipiid.o unipiutil.o -o $@
-+	$(CC) unipiid.o unipiutil.o $(LDFLAGS) -o $@
- 	@chmod +x $@
- 
- uhelper:  uhelper.o
--	$(CC) $< -o $@
-+	$(CC) $< $(LDFLAGS) -o $@
- 
- unipihostname: unipiid
- 	@ln -s $< $@
-@@ -87,6 +87,7 @@ unipihostname: unipiid
- #	@chmod +x $@
- 
- install:
-+	$(INSTALL) -d $(DESTDIR)/opt/unipi/tools
- 	$(INSTALL) -D $(BINFILES) $(SHFILES) -t $(DESTDIR)/opt/unipi/tools
- 	$(INSTALL) -D $(PYFILES) -t $(DESTDIR)/opt/unipi/os-configurator
- 

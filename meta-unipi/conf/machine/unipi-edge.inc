@@ -14,8 +14,10 @@ MACHINE_EXTRA_RRECOMMENDS += "\
     kernel-module-unipi-mfds \
     unipi-modbus-tools \
     unipi-firmware-tools \
+    unipi-os-configurator \
 "
 MACHINE_EXTRA_RRECOMMENDS += "${@bb.utils.contains('RPI_USE_U_BOOT', '1', 'u-boot-default-script', '', d)}"
+
 
 # rpi-base.inc expects no RTC, but this machine has one
 MACHINE_FEATURES_BACKFILL_CONSIDERED:remove = "rtc"
