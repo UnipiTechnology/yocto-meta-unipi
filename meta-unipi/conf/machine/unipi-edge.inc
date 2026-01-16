@@ -5,7 +5,7 @@ require conf/machine/include/arm/armv8a/tune-cortexa72.inc
 include conf/machine/include/rpi-base.inc
 include conf/machine/unipi-edge-scr.inc
 
-MACHINEOVERRIDES =. "raspberrypi4:unipi-edge:"
+MACHINEOVERRIDES =. "raspberrypi4:unipi_edge:"
 
 #MACHINE_FEATURES += "pci"
 MACHINE_EXTRA_RRECOMMENDS += "\
@@ -32,7 +32,7 @@ RDEPENDS:packagegroup-base-extended:remove = "packagegroup-base-wifi"
 RDEPENDS:packagegroup-base-extended:remove = "packagegroup-base-bluetooth"
 RDEPENDS:packagegroup-base-extended:remove = "packagegroup-base-nfc"
 RDEPENDS:packagegroup-base:remove = "packagegroup-base-zeroconf"
-
+RDEPENDS:packagegroup-core-base-utils:remove = "inetutils"
 
 RPI_KERNEL_DEVICETREE = "broadcom/bcm2711-rpi-cm4.dtb"
 BOOTIMG_DEVICETREE_OVERLAYS ?= "\
@@ -46,7 +46,10 @@ RPI_KERNEL_DEVICETREE_OVERLAYS = "\
     overlays/unipi_e411.dtbo \
     overlays/unipi_e412.dtbo \
     overlays/unipi_e413.dtbo \
+    overlays/unipi_e414.dtbo \
     overlays/antenna1.dtbo \
+    overlays/disable_wifi.dtbo \
+    overlays/disable_bt.dtbo \
 "
 BOOTIMG_DEVICETREE = "${RPI_KERNEL_DEVICETREE} ${BOOTIMG_DEVICETREE_OVERLAYS}"
 
@@ -73,6 +76,7 @@ PREFERRED_PROVIDER_virtual/bootloader ?= "u-boot"
 EXTRA_IMAGEDEPENDS += "virtual/bootloader"
 
 UBOOT_MACHINE ?= "unipi_edge_config"
+#KMACHINE = "unipi_edge"
 
 VC4DTBO ?= "vc4-kms-v3d"
 

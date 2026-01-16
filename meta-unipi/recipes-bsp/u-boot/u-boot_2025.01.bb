@@ -12,7 +12,7 @@ SRC_URI = "git://source.denx.de/u-boot/u-boot.git;protocol=https;branch=master \
 "
 
 DEPENDS += "bc-native dtc-native python3-pyelftools-native gnutls-native"
-COMPATIBLE_MACHINE = "unipi-edge"
+COMPATIBLE_MACHINE = "unipi_edge"
 RDEPENDS:${PN} += "u-boot-default-script"
 
 #do_deploy:append() {
