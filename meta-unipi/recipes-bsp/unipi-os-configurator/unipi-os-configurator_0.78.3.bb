@@ -5,20 +5,18 @@ udev rules, hostname ... \
 "
 HOMEPAGE = "http://unipi.technology/"
 SECTION = "base"
-LICENSE = "GPL-2.0-or-later"
-LIC_FILES_CHKSUM = "file://../../GPL-2.0-or-later;md5=fed54355545ffd980b814dab4a3b312c"
+LICENSE = "GPL-2.0-only"
+LIC_FILES_CHKSUM = "file://${COMMON_LICENSE_DIR}/GPL-2.0-only;md5=801f80980d171dd6425610833a22dbe6"
 
-RDEPENDS:${PN} = "python3-core (>=3.11) systemd bash"
+SRCREV = "88fbd8b603bd94aadd990b8069d2049d4f501949"
 SRC_URI = "git://git.unipi.technology/UniPi/os-configurator/unipi-os-configurator;protocol=https;branch=dev-trixie \
-  file://GPL-2.0-or-later \
-  file://Makefile.patch  \
 "
-
-SRCREV = "752cf5e1ac8db47b59fb6ba12b05a37a830eda8d"
 
 inherit systemd pkgconfig
 
 S = "${WORKDIR}/git/src"
+
+RDEPENDS:${PN} = "python3-core (>=3.11) systemd bash"
 
 EXTRA_OEMAKE = " PROJECT_VERSION=${PV}"
 TARGET_CC_ARCH += "${LDFLAGS}"
