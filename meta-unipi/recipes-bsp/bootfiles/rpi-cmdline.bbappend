@@ -1,6 +1,6 @@
 ## Don't use cmdline in case of using U-boot
 
-COMPATIBLE_MACHINE = "unipi-edge"
+COMPATIBLE_MACHINE = "unipi_edge"
 
 do_deploy() {
     install -d "${DEPLOYDIR}/${BOOTFILES_DIR_NAME}"

@@ -1,0 +1,31 @@
+
+/dts-v1/;
+/plugin/;
+
+/{
+    
+	compatible = "brcm,bcm2711";
+
+	fragment@104 {
+		target = <&bt>;
+		__overlay__ {
+			status = "disabled";
+		};
+	};
+
+	fragment@105 {
+		target = <&uart1>;
+		__overlay__ {
+			pinctrl-names = "default";
+			pinctrl-0 = <&uart1_bt_pins>;
+			status = "disabled";
+		};
+	};
+
+	fragment@108 {
+		target = <&minibt>;
+		__overlay__ {
+			status = "disabled";
+		};
+	};
+};

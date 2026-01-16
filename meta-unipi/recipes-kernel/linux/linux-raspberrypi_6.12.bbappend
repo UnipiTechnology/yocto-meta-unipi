@@ -13,11 +13,14 @@ SRC_URI += "\
   file://unipi_e411-overlay.dts;subdir=git/arch/arm/boot/dts/overlays\
   file://unipi_e412-overlay.dts;subdir=git/arch/arm/boot/dts/overlays\
   file://unipi_e413-overlay.dts;subdir=git/arch/arm/boot/dts/overlays\
+  file://unipi_e414-overlay.dts;subdir=git/arch/arm/boot/dts/overlays\
   file://unipi_uboot-overlay.dts;subdir=git/arch/arm/boot/dts/overlays\
   file://unipi_uboot_tpm-overlay.dts;subdir=git/arch/arm/boot/dts/overlays\
+  file://disable_wifi-overlay.dts;subdir=git/arch/arm/boot/dts/overlays\
+  file://disable_bt-overlay.dts;subdir=git/arch/arm/boot/dts/overlays\
 "
 
 # To enable local defconfig, we must deactivate  KBUILD_DEFCONFIG
-KBUILD_DEFCONFIG:unipi-edge = ""
+KBUILD_DEFCONFIG:unipi_edge = ""
 
 RDEPENDS:${KERNEL_PACKAGE_NAME}-base = "${KERNEL_PACKAGE_NAME}-devicetree"

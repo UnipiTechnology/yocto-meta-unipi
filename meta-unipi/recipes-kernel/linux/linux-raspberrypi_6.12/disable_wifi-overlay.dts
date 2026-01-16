@@ -1,0 +1,41 @@
+
+/dts-v1/;
+/plugin/;
+
+/{
+    
+	compatible = "brcm,bcm2711";
+
+	fragment@109 {
+		target = <&mmcnr>;
+		__overlay__ {
+			status = "disabled";
+		};
+	};
+
+	fragment@0 {
+		target = <&ant1>;
+		__overlay__ {
+			status = "disabled";
+		};
+	};
+	fragment@1 {
+		target = <&ant2>;
+		__overlay__ {
+			status = "disabled";
+		};
+	};
+	fragment@2 {
+		target = <&ant1alt>;
+		__overlay__ {
+			status = "disabled";
+		};
+	};
+	fragment@3 {
+		target = <&ant2alt>;
+		__overlay__ {
+			status = "disabled";
+		};
+	};
+
+};
