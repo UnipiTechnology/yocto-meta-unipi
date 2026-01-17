@@ -33,8 +33,11 @@ do_install:append() {
 
 FILES:${PN} += "/usr/lib/unipi/* \
                 ${systemd_unitdir}/system/sys-devices-platform-unipi\x2did.device.d/timeout.conf \
+                ${systemd_unitdir}/system/unipicheck.service \
 "
 
-SYSTEMD_SERVICE:${PN} = "clear-bootcount.service unipicheck.service"
+SYSTEMD_SERVICE:${PN} = "clear-bootcount.service"
+# add only for autoconfigure
+#SYSTEMD_SERVICE:${PN} = "unipicheck.service"
 
 BBCLASSEXTEND = "native"

@@ -14,7 +14,7 @@ MACHINE_EXTRA_RRECOMMENDS += "\
     kernel-module-unipi-mfds \
     unipi-modbus-tools \
     unipi-firmware-tools \
-    unipi-os-configurator \
+    unipi-os-configurator-data \
 "
 MACHINE_EXTRA_RRECOMMENDS += "${@bb.utils.contains('RPI_USE_U_BOOT', '1', 'u-boot-default-script', '', d)}"
 
