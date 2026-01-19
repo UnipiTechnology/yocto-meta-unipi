@@ -14,7 +14,9 @@ inherit systemd pkgconfig
 
 S = "${WORKDIR}/git"
 
-RDEPENDS:${PN} = "unipi-os-configurator"
+# split into packages
+PACKAGES =+ " unipi-os-configurator-data-base unipi-os-configurator-data-auto"
+RDEPENDS:${PN}-auto = "unipi-os-configurator-data-base"
 
 # Nothing to build, just install
 do_configure[noexec] = "1"
@@ -42,12 +44,21 @@ do_install:unipi_edge() {
     fi
 }
 
-FILES:${PN} += "/usr/lib/unipi/* \
+FILES:${PN}-base += " \
+    /usr/lib/unipi/fwi2c-check.sh \
     /usr/lib/systemd/network/* \
-    /usr/lib/systemd/system.conf.d \
-    /usr/lib/modprobe.d/fram-spi-alias.conf \
-    /usr/share/unipi-os-configurator/* \
+    /usr/lib/systemd/system.conf.d/* \
+    /usr/lib/modprobe.d/* \
+    /usr/lib/udev/rules.d \
     /usr/share/initramfs-tools/modules.d/unipi \
+    /etc/sysctl.d/* \
+    /etc/udev/rules.d/* \
+    /etc/modules-load.d/* \
+"
+FILES:${PN}-auto += "/usr/lib/unipi/unipi_values.py \
+    /usr/lib/unipi/run.d/* \
+    /usr/share/unipi-os-configurator/* \
+    /etc/bootcmd.d \
 "
 
 PACKAGE_ARCH = "${MACHINE_ARCH}"
