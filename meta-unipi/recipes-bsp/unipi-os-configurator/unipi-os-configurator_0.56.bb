@@ -5,12 +5,11 @@ udev rules, hostname ... \
 "
 HOMEPAGE = "http://unipi.technology/"
 SECTION = "base"
-LICENSE = "GPL-2.0-or-later"
-LIC_FILES_CHKSUM = "file://../../GPL-2.0-or-later;md5=fed54355545ffd980b814dab4a3b312c"
+LICENSE = "GPL-2.0-only"
+LIC_FILES_CHKSUM = "file://${COMMON_LICENSE_DIR}/GPL-2.0-only;md5=801f80980d171dd6425610833a22dbe6"
 
 RDEPENDS:${PN} = "python3 (>=3.11) systemd"
 SRC_URI = "git://git.unipi.technology/UniPi/os-configurator/unipi-os-configurator;protocol=https;branch=main \
-  file://GPL-2.0-or-later \
   file://Makefile.patch \
 "
 
