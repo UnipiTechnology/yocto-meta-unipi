@@ -104,6 +104,7 @@ local_conf_header:
     ## use journald instead of syslog
     VIRTUAL-RUNTIME_syslog = ""
     VIRTUAL-RUNTIME_base-utils-syslog = ""
+    DISTRO_FEATURES:append = " initramfs-boot"
 
   security: |
     DISTRO_FEATURES:append = " tpm2"
