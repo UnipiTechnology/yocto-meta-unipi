@@ -11,9 +11,6 @@ MACHINEOVERRIDES =. "raspberrypi4:unipi_edge:"
 MACHINE_EXTRA_RRECOMMENDS += "\
     kernel-module-unipi-id \
     kernel-module-unipi-rfkill \
-    kernel-module-unipi-mfds \
-    unipi-modbus-tools \
-    unipi-firmware-tools \
     unipi-os-configurator-switchboot \
     unipi-os-configurator-data \
 "
