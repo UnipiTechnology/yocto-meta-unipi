@@ -1,0 +1,10 @@
+#!/bin/sh
+
+if [ "$1" = "mender_systemd_machine_id" ]; then
+    if [ -r /boot/firmware/machine_id ]; then
+        printf "mender_systemd_machine_id=%s\n" "$(sed -nE '2q;/^[[:xdigit:]]{32}$/p' /boot/firmware/machine_id)"
+    fi
+    exit 0
+fi
+
+/usr/sbin/switchboot $@

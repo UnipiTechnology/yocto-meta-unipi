@@ -5,7 +5,7 @@ RECIPE_MAINTAINER = "Miroslav Ondra <ondra@unipi.technology>"
 LICENSE = "MIT"
 LIC_FILES_CHKSUM = "file://${COMMON_LICENSE_DIR}/MIT;md5=0835ade698e0bcf8506ecda2f7b4f302"
 
-IMAGE_FSTYPES = "ext4 wic"
+IMAGE_FSTYPES = "ext4 wic mender"
 IMAGE_OVERHEAD_FACTOR = "1.1"
 
 IMAGE_FEATURES:append = " package-management"
@@ -19,7 +19,8 @@ IMAGE_INSTALL:append = " procps"
 IMAGE_INSTALL:append = " file"
 IMAGE_INSTALL:append = " mc"
 IMAGE_INSTALL:append = " u-boot-tools-mkimage"
-IMAGE_INSTALL:append = " audit auditd audispd-plugins"
+#IMAGE_INSTALL:append = " audit auditd audispd-plugins"
+IMAGE_INSTALL:append = " initramfs-boot"
 
 IMAGE_FEATURES:remove = "splash"
 

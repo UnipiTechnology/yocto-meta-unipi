@@ -1,3 +1,4 @@
+
 require recipes-bsp/u-boot/u-boot-common.inc
 require recipes-bsp/u-boot/u-boot.inc
 
@@ -15,6 +16,10 @@ SRC_URI = "git://source.denx.de/u-boot/u-boot.git;protocol=https;branch=master \
 DEPENDS += "bc-native dtc-native python3-pyelftools-native gnutls-native"
 COMPATIBLE_MACHINE = "unipi_edge"
 RDEPENDS:${PN} += "u-boot-default-script"
+
+# This U-boot is incomaptible with mender-uboot
+# Mender is supported directly by this version
+MENDER_FEATURES_DISABLE:append = " mender-uboot"
 
 #do_deploy:append() {
 #    install -d ${DEPLOYDIR}/${BOOTFILES_DIR_NAME}
