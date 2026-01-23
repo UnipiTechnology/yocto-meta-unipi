@@ -1,5 +1,5 @@
 /dev/root            /                    auto       noatime,nodiratime,discard,x-systemd.growfs       0  1
-/dev/mmcblk0p1       /boot/firmware       vfat       noatime,nodiratime,discard,x-systemd.growfs,noauto,x-systemd.automount 0 2
+/dev/mmcblk0p1       /boot/firmware       vfat       noatime,nodiratime,discard,noauto,x-systemd.automount 0 2
 proc                 /proc                proc       defaults              0  0
 devpts               /dev/pts             devpts     mode=0620,ptmxmode=0666,gid=5      0  0
 tmpfs                /run                 tmpfs      mode=0755,nodev,nosuid,strictatime 0  0
