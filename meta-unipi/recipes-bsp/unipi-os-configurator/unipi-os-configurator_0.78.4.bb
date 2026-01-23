@@ -8,7 +8,7 @@ SECTION = "base"
 LICENSE = "GPL-2.0-only"
 LIC_FILES_CHKSUM = "file://${COMMON_LICENSE_DIR}/GPL-2.0-only;md5=801f80980d171dd6425610833a22dbe6"
 
-SRCREV = "88fbd8b603bd94aadd990b8069d2049d4f501949"
+SRCREV = "2bcaf22483c3fa68939369729d4c24b8b5c06495"
 SRC_URI = "git://git.unipi.technology/UniPi/os-configurator/unipi-os-configurator;protocol=https;branch=dev-trixie \
 "
 
@@ -24,13 +24,15 @@ do_install:append() {
     oe_runmake install DESTDIR=${D}
 
     install -d ${D}/usr/lib
-#    cp -r ${S}/../files/usr/lib/* ${D}/usr/lib
     cp -r ${S}/../files/* ${D}/
     install -d ${D}${systemd_unitdir}/system/
     install -m 0644 ${S}/../debian/unipi-os-configurator.clear-bootcount.service ${D}${systemd_unitdir}/system/clear-bootcount.service
     install -m 0644 ${S}/../debian/unipi-os-configurator.unipicheck.service ${D}${systemd_unitdir}/system/unipicheck.service
     rm -f  ${D}/etc/sysctl.d/80-ram-overcommit.conf
     rm -rf ${D}/usr/share/keyrings
+    if [ -n "${MENDER_ROOTFS_PART_A_NUMBER}" ] && [ -n "${MENDER_ROOTFS_PART_B_NUMBER}" ]; then
+        printf "A=%s\nB=%s\n" "${MENDER_ROOTFS_PART_A_NUMBER}" "${MENDER_ROOTFS_PART_B_NUMBER}" > ${D}${sysconfdir}/default/switchboot
+    fi
 }
 
 # split into packages
@@ -60,7 +62,7 @@ SYSTEMD_SERVICE:${PN}-switchboot = "clear-bootcount.service"
 SYSTEMD_SERVICE:${PN}-auto = "unipicheck.service"
 
 RDEPENDS:${PN}-base = "unipi-os-configurator-data-base"
-RDEPENDS:${PN}-auto = "python3-core (>=3.11) systemd bash ${PN}-base unipi-os-configurator-data-auto"
-RDEPENDS:${PN}-switchboot = "systemd bash util-linux-sfdisk ${PN}-base"
+RDEPENDS:${PN}-auto = "python3-core (>=3.11) systemd ${PN}-base unipi-os-configurator-data-auto"
+RDEPENDS:${PN}-switchboot = "systemd util-linux-sfdisk ${PN}-base"
 
 BBCLASSEXTEND = "native"
