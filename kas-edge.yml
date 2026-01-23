@@ -95,6 +95,7 @@ local_conf_header:
     # Uncomment next line to allow the license
     # See: linux-firmware-rpidistro in docs/ipcompliance.md
     LICENSE_FLAGS_ACCEPTED = "synaptics-killswitch"
+    PREFERRED_PROVIDER_coreutils = "uutils-coreutils"
 
   base-os: |
     INIT_MANAGER = "systemd"
