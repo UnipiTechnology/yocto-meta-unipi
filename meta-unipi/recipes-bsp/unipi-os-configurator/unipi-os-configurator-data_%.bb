@@ -16,7 +16,7 @@ S = "${WORKDIR}/git"
 
 # split into packages
 PACKAGES =+ " unipi-os-configurator-data-base unipi-os-configurator-data-auto"
-RDEPENDS:${PN}-auto = "unipi-os-configurator-data-base"
+#RDEPENDS:${PN}-auto = "unipi-os-configurator-data-base"
 
 # Nothing to build, just install
 do_configure[noexec] = "1"
@@ -40,7 +40,7 @@ do_install:unipi_edge() {
     esac
     if [ -n "$urule" ]; then
         install -d ${D}/etc/udev/rules.d
-        ln -s /usr/share/unipi-os-configurator/udev/$urule ${D}/etc/udev/rules.d/50-$urule
+        install -m 644 ${S}/udev/$urule ${D}/etc/udev/rules.d/50-$urule
     fi
 }
 
