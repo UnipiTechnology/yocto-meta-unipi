@@ -54,6 +54,10 @@ local_conf_header:
     # See: linux-firmware-rpidistro in docs/ipcompliance.md
     LICENSE_FLAGS_ACCEPTED = "synaptics-killswitch"
     PREFERRED_PROVIDER_coreutils = "uutils-coreutils"
+    RRECOMMENDS:kbd-keymaps:remove = "kbd-keymaps-pine"
+    PACKAGECONFIG:remove = "readline"
+    #PACKAGECONFIG:append = " libedit"
+
 
   base-os: |
     INIT_MANAGER = "systemd"
@@ -63,6 +67,7 @@ local_conf_header:
     VIRTUAL-RUNTIME_syslog = ""
     VIRTUAL-RUNTIME_base-utils-syslog = ""
     DISTRO_FEATURES:append = " initramfs-boot"
+    PACKAGECONFIG:remove:pn-systemd = "userdb"
 
   security: |
     DISTRO_FEATURES:append = " tpm2"
