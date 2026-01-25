@@ -10,3 +10,6 @@ do_install:append() {
     rm -f ${D}${datadir}/mender/inventory/mender-inventory-hostinfo
     install -m 755 ${WORKDIR}/mender-inventory-hostinfo ${D}${datadir}/mender/inventory/mender-inventory-hostinfo
 }
+
+RDEPENDS:mender-update:append:mender-growfs-data:mender-systemd = " util-linux-sfdisk util-linux-partx"
+RDEPENDS:mender-update:remove = "parted"
