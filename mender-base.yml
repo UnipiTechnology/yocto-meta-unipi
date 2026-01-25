@@ -1,0 +1,24 @@
+header:
+  version: 14
+
+repos:
+  meta-mender:
+    url: https://github.com/mendersoftware/meta-mender.git
+    commit: 4ae8e962a3c011cfc4d9e4b85878c226b2763b0c
+    path: layers/meta-mender
+
+    layers:
+      meta-mender-core:
+
+env:
+    MENDER_ARTIFACT_NAME: "baseos"
+
+local_conf_header:
+  base: |
+    CONF_VERSION = "2"
+    PACKAGE_CLASSES = "package_ipk"
+    INIT_MANAGER = "systemd"
+    PREFERRED_PROVIDER_mender-native =  "mender-native"
+    PREFERRED_RPROVIDER_mender-auth =   "mender"
+    PREFERRED_RPROVIDER_mender-update = "mender"
+

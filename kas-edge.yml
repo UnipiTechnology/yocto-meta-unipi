@@ -1,5 +1,8 @@
 header:
   version: 8
+  includes:
+  - ./base.yml
+  - ./mender-full.yml
 
 machine: unipi-e414
 distro: poky
@@ -10,51 +13,6 @@ repos:
   meta-unipi:
     path: meta-unipi
 
-  bitbake:
-    url: https://git.openembedded.org/bitbake
-    path: layers/bitbake
-    #tag: yocto-5.0.14
-    branch: '2.8'
-    layers:
-      .: disabled
-
-  openembedded-core:
-    url: https://git.openembedded.org/openembedded-core
-    path: layers/openembedded-core
-    branch: scarthgap
-    layers:
-      meta:
-
-  meta-yocto:
-    url: https://git.yoctoproject.org/meta-yocto
-    path: layers/meta-yocto
-    branch: scarthgap
-    layers:
-      meta-poky:
-      #meta-yocto-bsp:
-
-  meta-openembedded:
-    url: http://git.openembedded.org/meta-openembedded
-    path: layers/meta-openembedded
-    branch: scarthgap
-    layers:
-      meta-oe:
-      meta-python:
-      meta-networking:
-      #meta-perl:
-
-  meta-security:
-    url: https://git.yoctoproject.org/meta-security
-    path: layers/meta-security
-    branch: scarthgap
-    layers:
-      .:
-      meta-tpm:
-
-  meta-raspberrypi:
-    url: https://github.com/agherzan/meta-raspberrypi
-    path: layers/meta-raspberrypi
-    branch: scarthgap
 
 bblayers_conf_header:
   standard: |
@@ -119,3 +77,16 @@ local_conf_header:
 
   e41x: |
     RPI_USE_U_BOOT = "1"
+    INITRAMFS_IMAGE = "initramfs-boot-image"
+
+    MENDER_FEATURES_DISABLE:append = " mender-grub mender-image-uefi"
+    MENDER_SERVER_URL = "https://eu.hosted.mender.io"
+    MENDER_TENANT_TOKEN = "-Sfc_K2Zumhh925bo4vTcVis5wOsLnRExzHP4T7g2_A"
+    MENDER_DEVICE_TYPE = "unipi-e414"
+    MENDER_CONNECT_SHELL = "/bin/sh"
+    MENDER_CONNECT_USER = "root"
+    IMAGE_INSTALL:append:pn-base-os = " mender-connect"
+    SOURCE_DATE_EPOCH = "1767567600"
+
+    #MENDER_FEATURES_ENABLE:append = " mender-uboot mender-image-sd"
+    #MENDER_FEATURES_ENABLE:append = " mender-persist-systemd-machine-id"

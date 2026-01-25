@@ -1,0 +1,49 @@
+header:
+  version: 8
+
+repos:
+  bitbake:
+    url: https://git.openembedded.org/bitbake
+    path: layers/bitbake
+    #tag: yocto-5.0.14
+    branch: '2.8'
+    layers:
+      .: disabled
+
+  openembedded-core:
+    url: https://git.openembedded.org/openembedded-core
+    path: layers/openembedded-core
+    branch: scarthgap
+    layers:
+      meta:
+
+  meta-yocto:
+    url: https://git.yoctoproject.org/meta-yocto
+    path: layers/meta-yocto
+    branch: scarthgap
+    layers:
+      meta-poky:
+      #meta-yocto-bsp:
+
+  meta-openembedded:
+    url: http://git.openembedded.org/meta-openembedded
+    path: layers/meta-openembedded
+    branch: scarthgap
+    layers:
+      meta-oe:
+      meta-python:
+      meta-networking:
+      #meta-perl:
+
+  meta-security:
+    url: https://git.yoctoproject.org/meta-security
+    path: layers/meta-security
+    branch: scarthgap
+    layers:
+      .:
+      meta-tpm:
+
+  meta-raspberrypi:
+    url: https://github.com/agherzan/meta-raspberrypi
+    path: layers/meta-raspberrypi
+    branch: scarthgap
