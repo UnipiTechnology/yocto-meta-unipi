@@ -12,7 +12,7 @@ MACHINE_EXTRA_RRECOMMENDS += "\
     kernel-module-unipi-id \
     kernel-module-unipi-rfkill \
     unipi-os-configurator-switchboot \
-    unipi-os-configurator-data \
+    unipi-os-configurator-base \
 "
 MACHINE_EXTRA_RRECOMMENDS += "${@bb.utils.contains('RPI_USE_U_BOOT', '1', 'u-boot-default-script', '', d)}"
 
