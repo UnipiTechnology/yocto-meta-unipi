@@ -5,7 +5,7 @@ RECIPE_MAINTAINER = "Miroslav Ondra <ondra@unipi.technology>"
 LICENSE = "MIT"
 LIC_FILES_CHKSUM = "file://${COMMON_LICENSE_DIR}/MIT;md5=0835ade698e0bcf8506ecda2f7b4f302"
 
-IMAGE_FSTYPES = "ext4 wic mender"
+IMAGE_FSTYPES ?= "ext4 wic"
 IMAGE_OVERHEAD_FACTOR = "1.1"
 
 IMAGE_FEATURES:append = " package-management"
