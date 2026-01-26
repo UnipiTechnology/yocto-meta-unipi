@@ -83,11 +83,11 @@ local_conf_header:
   e41x: |
     RPI_USE_U_BOOT = "1"
     INITRAMFS_IMAGE = "initramfs-boot-image"
+    IMAGE_FSTYPES = "ext4 sdimg mender"
 
     MENDER_FEATURES_DISABLE:append = " mender-grub mender-image-uefi"
     MENDER_SERVER_URL = "https://eu.hosted.mender.io"
     MENDER_TENANT_TOKEN = "-Sfc_K2Zumhh925bo4vTcVis5wOsLnRExzHP4T7g2_A"
-    MENDER_DEVICE_TYPE = "unipi-e414"
     MENDER_CONNECT_SHELL = "/bin/sh"
     MENDER_CONNECT_USER = "root"
     IMAGE_INSTALL:append:pn-base-os = " mender-connect"

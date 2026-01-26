@@ -5,7 +5,7 @@ RECIPE_MAINTAINER = "Miroslav Ondra <ondra@unipi.technology>"
 LICENSE = "MIT"
 LIC_FILES_CHKSUM = "file://${COMMON_LICENSE_DIR}/MIT;md5=0835ade698e0bcf8506ecda2f7b4f302"
 
-IMAGE_FSTYPES = "ext4 wic mender"
+IMAGE_FSTYPES ?= "ext4 wic"
 IMAGE_OVERHEAD_FACTOR = "1.1"
 
 IMAGE_FEATURES:append = " package-management"
@@ -30,3 +30,17 @@ RDEPENDS:packagegroup-base-extended:remove = "packagegroup-base-3g"
 #IMAGE_FEATURES:append = " allow-root-login"
 #IMAGE_FEATURES:append = " allow-empty-password"
 #IMAGE_FEATURES:append = " empty-root-password"
+
+
+fix_image_sdimg () {
+    dev=${IMGDEPLOYDIR}/${IMAGE_NAME}.sdimg
+    if [ -r "$dev" ]; then
+        if sfdisk -d "$dev" | grep -q 'label: gpt'; then
+            sfdisk --no-reread --no-tell-kernel --quiet --part-attrs "$dev" 2 LegacyBIOSBootable
+            sfdisk --no-reread --no-tell-kernel --quiet --part-attrs "$dev" 1 ""
+        else
+            sfdisk --no-reread --no-tell-kernel --quiet --activate "$dev" 2
+        fi
+    fi
+}
+IMAGE_POSTPROCESS_COMMAND += "fix_image_sdimg"
