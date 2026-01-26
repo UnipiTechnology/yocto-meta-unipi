@@ -17,7 +17,7 @@ The following Unipi Edge models are supported or under active development:
 - **Unipi Edge E411**
 - **Unipi Edge E412**
 - **Unipi Edge E413**
-- **Unipi Edge E414** *(work in progress)*
+- **Unipi Edge E414**
 
 > ⚠️ Other Unipi product families are **not supported** by this BSP at this time and require separate BSPs or platform-specific integrations.
 
@@ -47,7 +47,8 @@ git clone https://git.unipi.technology/yocto/meta-unipi.git
 
 ### 3. Image Creation (Build)
 
-Start the image build using **KAS**. If no image name is specified, `base-os` is used by default:
+Start the image build using **KAS**. If no image name is specified, `base-os` is used by default.
+The kas-edge.yaml currently contains **Mender** layer and disables GPL-3 dependencies.
 
 ```bash
 kas build kas-edge.yml <image>
@@ -59,7 +60,11 @@ Example:
 kas build kas-edge.yml base-os
 ```
 
-The build output will be generated in the `build/tpm/deploy/` directory.
+The build output will be generated in the `build/tpm/deploy/` directory. There are these images among others:
+
+ - .sdimg - Full image with partition table and all partitions. It can be written to raw MMC
+ - .mender - Root fs in Mender format usable for mender-update
+ - .ext4 - Content of root fs partition
 
 ---
 
@@ -67,10 +72,10 @@ The build output will be generated in the `build/tpm/deploy/` directory.
 
 Image deployment procedures are **currently supported for Unipi Edge devices only**.
 
-After a successful build, locate the generated `.wic` image:
+After a successful build, locate the generated `.sdimg` (or `.wic`) image:
 
 ```text
-build/tmp/deploy/images/<machine>/*.wic
+build/tmp/deploy/images/<machine>/*.sdimg
 ```
 
 #### Unipi Edge Flashing
@@ -85,7 +90,7 @@ Connect the USB-C cable to the INIT port on the Unipi Edge and to your host syst
 firmware and on your host systems appears usb storage. If some filesystems from 
 usb storage were automounted, unmount them. Upload Wic image to MMC
 ```bash
-sudo dd if=build/tmp/deploy/<machine>/<image>.wic of=</dev/sdX> bs=1M
+sudo dd if=build/tmp/deploy/<machine>/<image>.sdimg of=</dev/sdX> bs=1M
 ```
 
 > 📘 **Further informations are available in the Unipi Knowledge Base:**  
