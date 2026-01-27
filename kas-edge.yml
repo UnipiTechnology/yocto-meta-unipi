@@ -87,11 +87,11 @@ local_conf_header:
 
     MENDER_FEATURES_DISABLE:append = " mender-grub mender-image-uefi"
     MENDER_SERVER_URL = "https://eu.hosted.mender.io"
-    MENDER_TENANT_TOKEN = "-Sfc_K2Zumhh925bo4vTcVis5wOsLnRExzHP4T7g2_A"
+    MENDER_TENANT_TOKEN = "XXXXXXXXXXXXXXXXXXX"
     MENDER_CONNECT_SHELL = "/bin/sh"
     MENDER_CONNECT_USER = "root"
     IMAGE_INSTALL:append:pn-base-os = " mender-connect"
-    SOURCE_DATE_EPOCH = "1767567600"
 
+    #SOURCE_DATE_EPOCH = "1767567600" 
     #MENDER_FEATURES_ENABLE:append = " mender-uboot mender-image-sd"
     #MENDER_FEATURES_ENABLE:append = " mender-persist-systemd-machine-id"
