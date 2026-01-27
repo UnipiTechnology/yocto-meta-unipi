@@ -50,6 +50,12 @@ git clone https://git.unipi.technology/yocto/meta-unipi.git
 Start the image build using **KAS**. If no image name is specified, `base-os` is used by default.
 The kas-edge.yaml currently contains **Mender** layer and disables GPL-3 dependencies.
 
+Variables in kas-edge.yml to configure:
+ - RPI_USE_U_BOOT = 1 # Required to enable if using Mender
+ - RPI_USE_RPIBOOT = 1 # Build boot.img container in boot partition
+ - RPI_USE_SECUREBOOT = 1  # Build boot.img and sign it to support RPi Secure boot
+
+
 ```bash
 kas build kas-edge.yml <image>
 ```
