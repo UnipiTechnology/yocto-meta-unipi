@@ -5,9 +5,9 @@ and external extensions connected to Unipi controller. \
 HOMEPAGE = "https://git.unipi.technology/UniPi/unipi-tools/"
 SECTION = "console/utils"
 
-DEPENDS = "libmodbus (>=3.1.4) libmhash ${@bb.utils.contains('DISTRO_FEATURES','systemd','systemd','',d)}"
-
-SRC_URI = "git://git.unipi.technology/UniPi/unipi-tools;protocol=https;branch=main-trixie"
+DEPENDS = "libmodbus (>=3.1.4) \
+           libmhash ${@bb.utils.contains('DISTRO_FEATURES','systemd','systemd','',d)} \
+"
 
 inherit autotools gettext pkgconfig ${@bb.utils.contains('DISTRO_FEATURES', 'systemd', 'systemd', 'update-rc.d', d)}
 
