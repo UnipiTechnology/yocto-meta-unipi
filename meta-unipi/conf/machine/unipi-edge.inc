@@ -75,6 +75,9 @@ PREFERRED_PROVIDER_u-boot-default-script ?= "unipi-u-boot-scr"
 PREFERRED_PROVIDER_virtual/bootloader ?= "u-boot"
 EXTRA_IMAGEDEPENDS += "virtual/bootloader"
 
+# setup second (rootfs) partition as active instead of first FAT
+IMAGE_CLASSES += "${@bb.utils.contains('RPI_USE_U_BOOT', '1', 'activate_part', '', d)}"
+
 UBOOT_MACHINE ?= "unipi_edge_config"
 #KMACHINE = "unipi_edge"
 
