@@ -20,11 +20,3 @@ RDEPENDS:${PN} += "u-boot-default-script"
 # This U-boot is incomaptible with mender-uboot
 # Mender is supported directly by this version
 MENDER_FEATURES_DISABLE:append = " mender-uboot"
-
-#do_deploy:append() {
-#    install -d ${DEPLOYDIR}/${BOOTFILES_DIR_NAME}
-#    BOOT_U_BOOT=${DEPLOYDIR}/${BOOTFILES_DIR_NAME}/${UBOOT_BINARY}
-#    install -D -m 644 ${B}/${UBOOT_BINARY} ${BOOT_U_BOOT}
-#}
-
-#do_deploy[dirs] += "${DEPLOYDIR}/${BOOTFILES_DIR_NAME}"
