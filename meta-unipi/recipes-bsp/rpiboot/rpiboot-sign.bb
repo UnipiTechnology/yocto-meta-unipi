@@ -3,11 +3,10 @@ LICENSE = "MIT"
 LIC_FILES_CHKSUM = "file://${COMMON_LICENSE_DIR}/MIT;md5=0835ade698e0bcf8506ecda2f7b4f302"
 COMPATIBLE_MACHINE = "^rpi$"
 
-inherit bootimage-rpi
+inherit rpiboot-sign
 
-#####ToDo: Add functions do sign image
+DEPENDS += "rpiboot-container"
 
-addtask deploy before do_build after do_install
-do_deploy[dirs] += "${DEPLOYDIR}"
+do_install[depends] += "rpiboot-container:do_deploy"
 
 PACKAGE_ARCH = "${MACHINE_ARCH}"

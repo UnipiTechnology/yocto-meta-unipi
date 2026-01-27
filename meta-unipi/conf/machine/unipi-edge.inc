@@ -94,23 +94,23 @@ KERNEL_BOOTCMD ?= "booti"
 
 #ARMSTUB ?= "armstub8-gic.bin"
 
-############# Rules for building BOOTIMG requiredby RPI SECURE BOOT
-# simple config.txt for bootimage
-EXTRA_IMAGEDEPENDS += "bootimg-config bootimg"
-do_image_wic[depends] += "bootimg-config:do_deploy bootimg:do_deploy"
+############# Rules for building RPIBOOT image required by RPi Secure boot
+# RPI_USE_RPIBOOT = "1"
+# RPI_USE_SIGNEDBOOT = "1"
 
-# setting of files NOT installed to bootimage
-FILTER_BOOTFILES ?= "bootcode.bin start4cd.elf fixup4cd.dat \
-                     fixup_cd.dat fixup.dat fixup_db.dat fixup_x.dat \
-                     start_cd.elf start_db.elf start.elf start_x.elf"
+EXTRA_IMAGEDEPENDS += "${@bb.utils.contains('RPI_USE_RPIBOOT', '1', 'rpiboot-container', '', d)}"
+EXTRA_IMAGEDEPENDS += "${@bb.utils.contains('RPI_USE_SIGNEDBOOT', '1', 'rpiboot-sign', '', d)}"
 
 # list of files installed to bootimage
-IMAGE_BOOTIMG_FILES = "${BOOTFILES_DIR_NAME}/* \
+RPIBOOT_IMAGE_FILES = "${BOOTFILES_DIR_NAME}/* \
                        ${@make_dtb_boot_files(d)} \
                        ${RPI_EXTRA_IMAGE_BOOT_FILES} \
                       "
 
 # list of files installed to native boot partition
-IMAGE_BOOT_FILES = "${@bb.utils.contains('RPI_USE_U_BOOT', '1', \
-                      'boot.img config.txt', \
-                      '${IMAGE_BOOTIMG_FILES}', d)}"
+IMAGE_BOOT_FILES = "${@bb.utils.contains('RPI_USE_SIGNEDBOOT', '1', \
+                        'boot.img config.txt boot.sig', \
+                      bb.utils.contains('RPI_USE_RPIBOOT', '1', \
+                        'boot.img config.txt', \
+                        '${RPIBOOT_IMAGE_FILES}', d), d)}"
+

@@ -82,6 +82,8 @@ local_conf_header:
 
   e41x: |
     RPI_USE_U_BOOT = "1"
+    #RPI_USE_RPIBOOT = "1"
+    RPI_USE_SIGNEDBOOT = "1"
     INITRAMFS_IMAGE = "initramfs-boot-image"
     IMAGE_FSTYPES = "ext4 sdimg mender"
 

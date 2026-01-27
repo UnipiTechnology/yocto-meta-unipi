@@ -1,74 +1,33 @@
-#
-# Create an FAT image with bootloader files
-#
+SUMMARY = "Boot image for Raspberry Pi secure boot"
+LICENSE = "MIT"
+LIC_FILES_CHKSUM = "file://${COMMON_LICENSE_DIR}/MIT;md5=0835ade698e0bcf8506ecda2f7b4f302"
+COMPATIBLE_MACHINE = "^rpi$"
+
+#SRC_URI = "file://config.txt.in"
+#SRC_URI[config.txt.in.sha256sum] = "8f05caab9c87d35c5539ad04dadf2082dc05fd89a25fa2cf9093a3d2a409da58"
 
 INHIBIT_DEFAULT_DEPS = "1"
 inherit deploy nopackages
 
-BOOTIMAGE_NAME ?= "boot.img"
-BOOTIMAGE_RPI_EXTRA_DEPENDS ?= ""
+DEPENDS = "dosfstools-native \
+           mtools-native \
+           rpi-bootfiles u-boot \
+           linux-raspberrypi \
+           rpiboot-config \
+          "
 
-# For the names of kernel artifacts
-inherit kernel-artifact-names
-
-
-do_deploy[depends] = " \
-    mtools-native:do_populate_sysroot \
-    dosfstools-native:do_populate_sysroot \
-    rpi-bootfiles:do_deploy \
-    virtual/kernel:do_deploy \
-    ${@bb.utils.contains('RPI_USE_U_BOOT', '1', 'u-boot:do_deploy', '', d)} \
-    ${BOOTIMAGE_RPI_EXTRA_DEPENDS} \
-"
-
-do_deploy[recrdeps] = "do_build"
-
-# Additional files and/or directories to be copied into the vfat partition from the IMAGE_ROOTFS.
-FATPAYLOAD ?= ""
-
-do_deploy () {
-
-    FATIMG="${DEPLOYDIR}/${BOOTIMAGE_NAME}"
-    BLOCKS=${BOOTIMAGE_BLOCKS}
-
-    # mkdosfs will sometimes use FAT16 when it is not appropriate,
-    # resulting in a boot failure from SYSLINUX. Use FAT32 for
-    # images larger than 512MB, otherwise let mkdosfs decide.
-    if [ $(expr $BLOCKS / 1024) -gt 512 ]; then
-         FATSIZE="-F 32"
-    fi
-
-    # mkdosfs will fail if ${FATIMG} exists. Since we are creating an
-    # new image, it is safe to delete any previous image.
-    if [ -e ${FATIMG} ]; then
-        rm ${FATIMG}
-    fi
-
-    mkdosfs ${FATSIZE} -n BOOTIMG -C ${FATIMG} ${BLOCKS}
-
-    for entry in ${BOOTIMAGE_INSTALL} ; do
-        # Split entry at optional ':' to enable file renaming for the destination
-        if [ $(echo "$entry" | grep -c :) = "0" ] ; then
-            DEPLOY_FILE="$entry"
-            DEST_FILENAME="$entry"
-        else
-            DEPLOY_FILE="$(echo "$entry" | cut -f1 -d:)"
-            DEST_FILENAME="$(echo "$entry" | cut -f2- -d:)"
-        fi
-        if [ $(dirname ${DEST_FILENAME}) != "." ]; then
-            mmd -i ${FATIMG} ::$(dirname ${DEST_FILENAME}) || true
-        fi
-        mcopy -v -i ${FATIMG} -s ${DEPLOY_DIR_IMAGE}/${DEPLOY_FILE} ::${DEST_FILENAME} \
-          || bbfatal "mcopy cannot copy ${DEPLOY_DIR_IMAGE}/${DEPLOY_FILE} into boot.img"
-    done
+do_configure() {
+    :
 }
 
+do_compile() {
+    :
+}
 
-python prepare_bootimage_size () {
+python prepare_bootimg_source() {
     import re
     from glob import glob
-    boot_files = d.getVar('IMAGE_BOOTIMG_FILES')
-    # add FATPAYLOAD
+    boot_files = d.getVar('RPIBOOT_IMAGE_FILES')
     kernel_dir = d.getVar('DEPLOY_DIR_IMAGE')
     filter_bootfiles = d.getVar('FILTER_BOOTFILES') or ''
     filter_files = filter_bootfiles.split()
@@ -133,16 +92,61 @@ python prepare_bootimage_size () {
     bb.debug(1, 'Blocks: %d kB, Dir entries: %d, Files: %d bytes' % (blocks, f_count+d_count, f_sectors*512))
     d.setVar('BOOTIMAGE_BLOCKS', str(blocks))
     d.setVar('BOOTIMAGE_INSTALL', ' '.join(('%s:%s' % (s,d) for s,d in install_task)))
-    d.setVarFlag('BOOTIMAGE_BLOCKS', 'export', '1')
-    d.setVarFlag('BOOTIMAGE_INSTALL', 'export', '1')
 }
 
-do_configure() {
-    # This is here temporary to add dependency of bootimage generator on variable FILTER_BOOTFILES
-    echo '${FILTER_BOOTFILES}'
+build_fat_img() {
+    FATSOURCEDIR=${DEPLOY_DIR_IMAGE}/${BOOTFILES_DIR_NAME}
+    FATIMG=${DEPLOYDIR}/boot.img
+    BLOCKS=${BOOTIMAGE_BLOCKS}
+
+    # mkdosfs will sometimes use FAT16 when it is not appropriate,
+    # resulting in a boot failure from SYSLINUX. Use FAT32 for
+    # images larger than 512MB, otherwise let mkdosfs decide.
+    if [ $(expr $BLOCKS / 1024) -gt 512 ]; then
+         FATSIZE="-F 32"
+    fi
+
+    # mkdosfs will fail if ${FATIMG} exists. Since we are creating an
+    # new image, it is safe to delete any previous image.
+    if [ -e ${FATIMG} ]; then
+        rm ${FATIMG}
+    fi
+
+    mkdosfs ${FATSIZE} -n BOOTIMG -C ${FATIMG} ${BLOCKS}
+
+    # Copy FATSOURCEDIR recursively into the image file directly
+    #mcopy -i ${FATIMG} -s ${FATSOURCEDIR}/* ::/
+
+    for entry in ${BOOTIMAGE_INSTALL} ; do
+        # Split entry at optional ':' to enable file renaming for the destination
+        if [ $(echo "$entry" | grep -c :) = "0" ] ; then
+            DEPLOY_FILE="$entry"
+            DEST_FILENAME="$entry"
+        else
+            DEPLOY_FILE="$(echo "$entry" | cut -f1 -d:)"
+            DEST_FILENAME="$(echo "$entry" | cut -f2- -d:)"
+        fi
+        if [ $(dirname ${DEST_FILENAME}) != "." ]; then
+            mmd -i ${FATIMG} ::$(dirname ${DEST_FILENAME}) || true
+        fi
+        mcopy -v -i ${FATIMG} -s ${DEPLOY_DIR_IMAGE}/${DEPLOY_FILE} ::${DEST_FILENAME} \
+          || bbfatal "mcopy cannot copy ${DEPLOY_DIR_IMAGE}/${DEPLOY_FILE} into boot.img"
+    done
 }
 
-do_deploy[prefuncs] = 'prepare_bootimage_size'
+
+python do_deploy() {
+    bb.build.exec_func("prepare_bootimg_source", d)
+    bb.build.exec_func("build_fat_img", d)
+}
+
+do_deploy[depends] += "dosfstools-native:do_populate_sysroot \
+                       mtools-native:do_populate_sysroot \
+                       rpi-bootfiles:do_deploy \
+                       u-boot:do_deploy \
+                       linux-raspberrypi:do_deploy"
 
 addtask deploy before do_build after do_install
 do_deploy[dirs] += "${DEPLOYDIR}"
+
+PACKAGE_ARCH = "${MACHINE_ARCH}"

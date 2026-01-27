@@ -4,14 +4,12 @@ LIC_FILES_CHKSUM = "file://${COMMON_LICENSE_DIR}/MIT;md5=0835ade698e0bcf8506ecda
 COMPATIBLE_MACHINE = "^rpi$"
 
 SRC_URI = "file://config.txt.in"
-#SRC_URI[config.txt.in.sha256sum] = "8f05caab9c87d35c5539ad04dadf2082dc05fd89a25fa2cf9093a3d2a409da58"
 
 INHIBIT_DEFAULT_DEPS = "1"
 inherit deploy nopackages
 
-do_configure() {
-    :
-}
+do_configure[noexec] = "1"
+do_install[noexec] = "1"
 
 do_compile() {
     cat "${WORKDIR}/config.txt.in" > ${B}/config.txt
