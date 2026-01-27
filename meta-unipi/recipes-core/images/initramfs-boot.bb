@@ -6,7 +6,7 @@ INITRAMFS_IMAGE_NAME ?= "${INITRAMFS_IMAGE}"
 INITRAMFS_IMAGE_FILE ?= "${INITRAMFS_IMAGE_NAME}-${MACHINE}.cpio.gz"
 INITRAMFS_FILE = "${PN}-${MACHINE}"
 
-DEPENDS = "${INITRAMFS_IMAGE_NAME}"
+DEPENDS = "${INITRAMFS_IMAGE}"
 ALLOW_EMPTY:${PN} = "1"
 ALLOW_EMPTY:${PN}-dev = ""
 ALLOW_EMPTY:${PN}-dbg = ""
@@ -22,6 +22,6 @@ do_install() {
     install -m 644 ${DEPLOY_DIR_IMAGE}/${INITRAMFS_IMAGE_FILE} ${D}/boot/${INITRAMFS_FILE}
 }
 
-do_install[depends] += "${INITRAMFS_IMAGE_NAME}:do_image_complete"
+do_install[depends] += "${INITRAMFS_IMAGE}:do_image_complete"
 
 PACKAGE_ARCH = "${MACHINE_ARCH}"
