@@ -16,6 +16,7 @@ do_compile() {
         -e 's/@@KERNEL_BOOTCMD@@/${KERNEL_BOOTCMD}/' \
         -e 's/@@U_BOOT_OVERLAYS@@/${U_BOOT_OVERLAYS}/' \
         -e 's/@@BOOT_MEDIA@@/${BOOT_MEDIA}/' \
+        -e 's#@@BOOTARGS@@#${U_BOOT_SCR_BOOTARGS}#' \
         "${WORKDIR}/boot.cmd.in" > "${WORKDIR}/boot.cmd"
     mkimage -A ${UBOOT_ARCH} -T script -C none -n "Boot script" -d "${WORKDIR}/boot.cmd" boot.scr
 }
@@ -37,4 +38,6 @@ FILES:${PN} = "/boot/boot.scr"
 
 PROVIDES += "u-boot-default-script"
 RPROVIDES:${PN} += "u-boot-default-script"
+
+RDEPENDS:${PN} += "${@'initramfs-boot' if d.getVar('INITRAMFS_IMAGE', True) else ''}"
 
