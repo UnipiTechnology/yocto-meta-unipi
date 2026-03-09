@@ -3,6 +3,7 @@ header:
   includes:
   - ./base.yml
   - ./mender-full.yml
+  - ./no-dhcpcd.yml
 
 machine: unipi-e414
 distro: poky
@@ -71,13 +72,6 @@ local_conf_header:
   security: |
     DISTRO_FEATURES:append = " tpm2"
     DISTRO_FEATURES:append = " security"
-
-  no-dhcp: |
-    ## Using systemd-networkd doesn't require dhcpcd
-    ## Don't install dhcpcd at all
-    ## RDEPENDS:packagegroup-core-base-utils:remove = "dhcpcd"
-    ## Or disable starting dhcpcd as daemon via systemd
-    SYSTEMD_AUTO_ENABLE:dhcpcd = "disable"
 
   e41x: |
     RPI_USE_U_BOOT = "1"

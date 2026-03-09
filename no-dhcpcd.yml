@@ -1,0 +1,11 @@
+header:
+  version: 1
+
+local_conf_header:
+  no-dhcp: |
+    ## Using systemd-networkd doesn't require dhcpcd
+    ## Don't install dhcpcd at all
+    RDEPENDS:packagegroup-core-base-utils:remove = "dhcpcd"
+    ## Or disable starting dhcpcd as daemon via systemd
+    SYSTEMD_AUTO_ENABLE:dhcpcd = "disable"
+

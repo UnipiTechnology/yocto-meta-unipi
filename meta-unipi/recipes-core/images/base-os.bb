@@ -14,7 +14,10 @@ IMAGE_INSTALL:append = " packagegroup-compat-base-utils"
 IMAGE_INSTALL:append = " packagegroup-security-tpm2"
 IMAGE_INSTALL:append = " os-release"
 IMAGE_INSTALL:append = " u-boot-tools-mkimage"
-IMAGE_INSTALL:append = " ${@'initramfs-boot' if d.getVar('INITRAMFS_IMAGE', True) else ''}"
+
+# this dependency moved to u-boot-script
+#IMAGE_INSTALL:append = " ${@'initramfs-boot' if d.getVar('INITRAMFS_IMAGE', True) else ''}"
+
 #IMAGE_INSTALL:append = " audit auditd audispd-plugins"
 #IMAGE_INSTALL:append = " mc"
 #IMAGE_INSTALL:append = " mbpoll"

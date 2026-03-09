@@ -17,7 +17,6 @@ RDEPENDS:${PN} = "\
     base-passwd \
     bind-utils \
     uutils-coreutils \
-    dhcpcd \
     e2fsprogs \
     ed \
     file \
