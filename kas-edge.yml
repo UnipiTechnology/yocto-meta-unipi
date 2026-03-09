@@ -68,6 +68,7 @@ local_conf_header:
     VIRTUAL-RUNTIME_syslog = ""
     VIRTUAL-RUNTIME_base-utils-syslog = ""
     PACKAGECONFIG:remove:pn-systemd = "userdb"
+    UNIPI_FSTAB = "1"
 
   security: |
     DISTRO_FEATURES:append = " tpm2"
