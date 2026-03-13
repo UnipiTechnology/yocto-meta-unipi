@@ -37,6 +37,7 @@ setexpr bootargs gsub "console=[^ ]* " ""
 setexpr bootargs gsub "root=[^ ]* " ""
 setexpr bootargs gsub "rootfstype=[^ ]* " ""
 setexpr bootargs gsub "kgdboc=[^ ]* " ""
+setexpr bootargs gsub "cgroup_disable=[^ ]* " ""
 setenv bootargs root=/dev/mmcblk${devnum}p${distro_bootpart} @@BOOTARGS@@ systemd.watchdog_device=/dev/watchdog1 net.ifnames=0 audit=0 ${bootargs}
 if test "${extra}" = "" ; then
    setenv extra panic=10 quiet
