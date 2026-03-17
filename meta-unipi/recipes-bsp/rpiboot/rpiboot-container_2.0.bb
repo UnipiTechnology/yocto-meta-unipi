@@ -7,7 +7,7 @@ inherit rpiboot-container
 
 BOOTIMAGE_RPI_EXTRA_DEPENDS ?= ""
 
-DEPENDS += "rpiboot-config ${BOOTIMAGE_RPI_EXTRA_DEPENDS}"
+DEPENDS += "rpiboot-config ${BOOTIMAGE_RPI_EXTRA_DEPENDS} rpi-config"
 
 do_deploy[depends] += " \
     rpi-bootfiles:do_deploy \

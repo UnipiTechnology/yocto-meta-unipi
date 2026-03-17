@@ -1,0 +1,129 @@
+/dts-v1/;
+
+/plugin/;
+
+/ {
+	fragment@0 {
+		target = <&spi0>;
+		__overlay__ {
+			status = "okay";
+			pinctrl-0 = <&spi0_pins>, <&spi0_cs_pins4>;
+			cs-gpios = <&gpio 8 1>, <&gpio 7 1>, <&gpio 24 1>, <&gpio 25 1>;
+			#address-cells = <1>;
+			#size-cells = <0>;unipispi1: unipispi@1 {
+				compatible = "unipispi";
+				reg = <1>;
+				spi-max-frequency = <12000000>;
+				status = "okay";
+				modbus-address = <1>;
+				neuron-board-index = <0>;
+				neuron-probe-always-succeeds = <0>;
+				#address-cells = <1>;
+				#size-cells = <0>;
+				iogroup1: iogroup@1 {
+					reg = <1>;
+					compatible = "unipi,unipi-mfd", "iogroup";
+					fw_variant = <0x0010>, <0x0020>, <0x0030>;
+					fw_name = "B-1000-1", "B-1000-2", "B-1000-3";
+					board_name = "B-1000-1";
+					sys_board_name = "B_1000";
+					cycle_counter = <1032>;
+					master_watchdog_enable = <6>;
+
+					di {
+						compatible = "unipi,gpio-di";
+						gpio-controller;
+						#gpio-cells = <2>;
+						gpio-line-names = "DI1_1", "DI1_2", "DI1_3", "DI1_4";
+						ngpio = <4>;
+						value-reg = <0>;
+						debounce-reg = <1010>;
+						counter-reg = <8>;
+					};
+					do {
+						compatible = "unipi,gpio-do";
+						ngpio = <4>;
+						value-coil = <0>;
+						gpio-controller;
+						#gpio-cells = <2>;
+						gpio-line-names = "DO1_1", "DO1_2", "DO1_3", "DO1_4";
+					};
+					aio {
+						compatible = "unipi,aio_legacy";
+						ai-value-reg = <3>;
+						ai-mode-reg = <1024>;
+						ao-value-reg = <2>;
+						ao-mode-reg = <1019>;
+					};
+					uart {
+						compatible = "unipi,uart";
+						port-count = <1>;
+						port-line = <0>;
+					};
+					led {
+						compatible = "unipi,leds";
+						coil-range = <8 4>;
+						label-prefix = "unipi:green:uled-x";
+					};
+					sysled {
+						compatible = "unipi,leds";
+						coil-range = <12 6>;
+						label-prefix = "unipi:green:sysled-x";
+					};
+				};
+			};
+		
+		};
+	};
+
+	/* the cs and interrupt pin of the neuron-controller */
+	fragment@1 {
+		target = <&gpio>;
+		__overlay__ {
+			spi0_cs_pins4: spi0_cs_pins4 {
+				brcm,pins = <8 7 24 25>;
+				brcm,function = <1>;
+				brcm,pull = <0>;
+			};
+			pinctrl_slotirq1: pinctrl_slotirq1 {
+				brcm,pins = <27>;
+				brcm,function = <0>;
+				brcm,pull = <1>;
+			};
+			pinctrl_slotirq2: pinctrl_slotirq2 {
+				brcm,pins = <23>;
+				brcm,function = <0>;
+				brcm,pull = <1>;
+			};
+			pinctrl_slotirq3: pinctrl_slotirq3 {
+				brcm,pins = <22>;
+				brcm,function = <0>;
+				brcm,pull = <1>;
+			};
+		};
+	};
+
+	fragment@3 {
+		target = <&spidev1>;
+		__overlay__ {
+			status = "disabled";
+		};
+	};
+	
+
+	__overrides__ {probe1-succeeds = <&unipispi1>,"neuron-probe-always-succeeds:0";
+			frequency1 = <&unipispi1>,"spi-max-frequency:0";};
+};
+
+&iogroup1 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_slotirq1>; 
+	interrupt-parent = <&gpio>;
+	interrupts = <27 1>; /* EDGE RISING*/
+};
+
+
+
+
+
+

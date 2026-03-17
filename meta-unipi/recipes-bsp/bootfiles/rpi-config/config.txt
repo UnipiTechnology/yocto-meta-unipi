@@ -1,4 +1,4 @@
-dtoverlay=unipi_uboot_tpm
+dtoverlay=unipi_uboot
 
 # Boot u-boot and set its proper device tree
 kernel=u-boot.bin

@@ -5,8 +5,6 @@ require conf/machine/include/arm/armv8a/tune-cortexa72.inc
 include conf/machine/include/rpi-base.inc
 include conf/machine/unipi-2711-scr.inc
 
-MACHINEOVERRIDES =. "raspberrypi4:unipi_edge:"
-
 #MACHINE_FEATURES += "pci"
 MACHINE_EXTRA_RRECOMMENDS += "\
     kernel-module-unipi-id \
@@ -34,25 +32,6 @@ RDEPENDS:packagegroup-base-extended:remove = "packagegroup-base-nfc"
 RDEPENDS:packagegroup-base:remove = "packagegroup-base-zeroconf"
 RDEPENDS:packagegroup-core-base-utils:remove = "inetutils"
 
-RPI_KERNEL_DEVICETREE = "broadcom/bcm2711-rpi-cm4.dtb"
-BOOTIMG_DEVICETREE_OVERLAYS ?= "\
-    overlays/vc4-kms-v3d-pi4.dtbo \
-    overlays/unipi_uboot_tpm.dtbo \
-    overlays/unipi_uboot.dtbo \
-"
-RPI_KERNEL_DEVICETREE_OVERLAYS = "\
-    ${BOOTIMG_DEVICETREE_OVERLAYS} \
-    overlays/unipi_e410.dtbo \
-    overlays/unipi_e411.dtbo \
-    overlays/unipi_e412.dtbo \
-    overlays/unipi_e413.dtbo \
-    overlays/unipi_e414.dtbo \
-    overlays/antenna1.dtbo \
-    overlays/disable_wifi.dtbo \
-    overlays/disable_bt.dtbo \
-"
-BOOTIMG_DEVICETREE = "${RPI_KERNEL_DEVICETREE} ${BOOTIMG_DEVICETREE_OVERLAYS}"
-
 # install dtb and dtbo into directories (broadcom, overlays)
 KERNEL_DTBVENDORED = "${@bb.utils.contains('RPI_USE_U_BOOT', '1', '1', '0', d)}"
 
@@ -66,7 +45,6 @@ SDIMG_KERNELIMAGE ?= " \
 WIC_CREATE_EXTRA_ARGS:append = " --no-fstab-update"
 
 # disable serial console in Linux
-#SERIAL_CONSOLES = "115200;ttyAMA1"
 SERIAL_CONSOLES = ""
 
 PREFERRED_VERSION_linux-raspberrypi ?= "6.12.%"
@@ -77,9 +55,6 @@ EXTRA_IMAGEDEPENDS += "virtual/bootloader"
 
 # setup second (rootfs) partition as active instead of first FAT
 IMAGE_CLASSES += "${@bb.utils.contains('RPI_USE_U_BOOT', '1', 'activate_part', '', d)}"
-
-UBOOT_MACHINE ?= "unipi_edge_config"
-#KMACHINE = "unipi_edge"
 
 VC4DTBO ?= "vc4-kms-v3d"
 
