@@ -14,7 +14,9 @@ SRC_URI = "git://source.denx.de/u-boot/u-boot.git;protocol=https;branch=master \
 "
 
 DEPENDS += "bc-native dtc-native python3-pyelftools-native gnutls-native"
-COMPATIBLE_MACHINE = "unipi_edge"
+COMPATIBLE_MACHINE = "^$"
+COMPATIBLE_MACHINE:unipi_edge = "unipi_edge"
+COMPATIBLE_MACHINE:unipi_neuron = "unipi_neuron"
 RDEPENDS:${PN} += "u-boot-default-script"
 
 # This U-boot is incomaptible with mender-uboot

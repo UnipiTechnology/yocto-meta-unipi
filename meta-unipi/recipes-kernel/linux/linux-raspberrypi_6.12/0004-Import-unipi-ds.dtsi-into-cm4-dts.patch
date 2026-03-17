@@ -1,12 +1,23 @@
-From 57ed0c82aa6602377b62b6e45628e58f7b3eda66 Mon Sep 17 00:00:00 2001
+From d3a354c0585e071167b8919387433f403071ae88 Mon Sep 17 00:00:00 2001
 From: Miroslav Ondra <ondra@faster.cz>
-Date: Tue, 16 Dec 2025 02:45:27 +0100
+Date: Tue, 17 Mar 2026 17:37:44 +0100
 Subject: [PATCH] Import unipi-ds.dtsi into cm4 dts
 
 ---
+ arch/arm/boot/dts/broadcom/bcm2711-rpi-4-b.dts | 2 ++
  arch/arm/boot/dts/broadcom/bcm2711-rpi-cm4.dts | 2 ++
- 1 file changed, 2 insertions(+)
+ 2 files changed, 4 insertions(+)
 
+diff --git a/arch/arm/boot/dts/broadcom/bcm2711-rpi-4-b.dts b/arch/arm/boot/dts/broadcom/bcm2711-rpi-4-b.dts
+index a4aae12775dc..2f5ca2855d3e 100644
+--- a/arch/arm/boot/dts/broadcom/bcm2711-rpi-4-b.dts
++++ b/arch/arm/boot/dts/broadcom/bcm2711-rpi-4-b.dts
+@@ -508,3 +508,5 @@ __overrides__ {
+ 		eth_led1 = <&phy1>,"led-modes:4";
+ 	};
+ };
++
++#include "unipi-ds.dtsi"
 diff --git a/arch/arm/boot/dts/broadcom/bcm2711-rpi-cm4.dts b/arch/arm/boot/dts/broadcom/bcm2711-rpi-cm4.dts
 index c218f9cf823f..4c700d4b097e 100644
 --- a/arch/arm/boot/dts/broadcom/bcm2711-rpi-cm4.dts

@@ -5,7 +5,9 @@ DESCRIPTION = "Commented config.txt file for the Raspberry Pi. \
 LICENSE = "MIT"
 LIC_FILES_CHKSUM = "file://${COMMON_LICENSE_DIR}/MIT;md5=0835ade698e0bcf8506ecda2f7b4f302"
 
-COMPATIBLE_MACHINE = "unipi_edge"
+COMPATIBLE_MACHINE = "^$"
+COMPATIBLE_MACHINE:unipi_edge = "unipi_edge"
+COMPATIBLE_MACHINE:unipi_neuron = "unipi_neuron"
 
 SRC_URI = "file://config.txt"
 
@@ -26,6 +28,9 @@ do_deploy() {
 
     cp ${S}/config.txt $CONFIG
 
+    if echo ":${MACHINEOVERRIDES}:" | grep -q ":unipi_edge:"; then
+        sed -i 's/dtoverlay=unipi_uboot/dtoverlay=unipi_uboot_tpm/' $CONFIG
+    fi
     if [ "${RPI_USE_U_BOOT}" = "1" ]; then
         sed -i '/^.*kernel=.*$/ c\kernel=u-boot.bin' $CONFIG
     else
