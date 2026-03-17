@@ -10,7 +10,7 @@
 	fragment@1 {
 		target = <&phy1>;
 		__overlay__ {
-			led-modes = <0x00 0x08>;
+			led-modes = <0x08 0x00>;
 		};
 	};
 
@@ -62,6 +62,14 @@
 			chassis-type = "embedded";
 		};
 	};
+
+	fragment@7 {
+		target = <&xhci>;
+		__overlay__ {
+			status = "okay";
+		};
+	};
+
     fragment@10 {
 		target-path = "/";
 		__overlay__ {

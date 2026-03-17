@@ -1,4 +1,5 @@
 
+
 /dts-v1/;
 /plugin/;
 
@@ -9,7 +10,7 @@
 	fragment@1 {
 		target = <&phy1>;
 		__overlay__ {
-			led-modes = <0x00 0x08>;
+			led-modes = <0x08 0x00>;
 		};
 	};
 
@@ -20,44 +21,61 @@
 		};
 	};
 
+	fragment@3 {
+		target = <&ant1>;
+		__overlay__ {
+			status = "disabled";
+		};
+	};
+
+	fragment@4 {
+		target = <&ant2>;
+		__overlay__ {
+			status = "disabled";
+		};
+	};
+
+	fragment@5 {
+		target = <&expgpio>;
+		__overlay__ {
+			ant1alt: ant1alt-hog {
+				gpio-hog;
+				gpios = <3 0>; // GPIO_ACTIVE_HIGH
+				/* internal antenna disabled */
+				output-low;
+				line-name = "ant1";
+			};
+
+			ant2alt: ant2alt-hog {
+				gpio-hog;
+				gpios = <7 0>; // GPIO_ACTIVE_HIGH
+				/* external antenna enabled */
+				output-high;
+				line-name = "ant2";
+			};
+		};
+	};
+
 	fragment@6 {
 		target-path = "/";
 		__overlay__ {
 			chassis-type = "embedded";
 		};
 	};
+
+	fragment@7 {
+		target = <&xhci>;
+		__overlay__ {
+			status = "okay";
+		};
+	};
+
     fragment@10 {
 		target-path = "/";
 		__overlay__ {
 			model = "Unipi Edge E414";
 		};
 	};
- 
-	fragment@51 {
-		target = <&spi6_cs_pins>;
-		__overlay__ {
-			brcm,pins = <18>, <23>;
-			brcm,function = <1>; // output input
-			brcm,pull = <0>, <0>;
-		};
-	};
-
-	fragment@52 {
-		target = <&spi6>;
-		__overlay__ {
-			// needed to avoid dtc warning
-			#address-cells = <1>;
-			#size-cells = <0>;
-			compatible = "brcm,bcm2835-spi";
-			pinctrl-names = "default";
-			pinctrl-0 = <&spi6_pins &spi6_cs_pins>;
-			cs-gpios = <&gpio 18 1>, <&gpio 23 1>;
-			dmas = <&dma 23>, <&dma 27>;
-			dma-names = "tx", "rx";
-			status = "okay";
-		};
-	};
-
  	fragment@101 {
 		target-path = "/aliases";
 		__overlay__ {
@@ -103,55 +121,16 @@
 		__overlay__ {
 			pinctrl-names = "default";
 			pinctrl-0 = <&uart1_bt_pins>;
-			status = "disabled";
+			status = "okay";
 		};
 	};
 
 	fragment@108 {
 		target = <&minibt>;
 		__overlay__ {
-			status = "disabled";
+			status = "okay";
 		};
 	};
- 
-	fragment@109 {
-		target = <&mmcnr>;
-		__overlay__ {
-			status = "disabled";
-		};
-	};
- 
-        fragment@300 {
-                target = <&spi4>;
-                __overlay__ {
-                        status = "okay";
-                        pinctrl-names = "default";
-                        pinctrl-0 = <&spi4_pins &spi4_cs_pins>;
-                        cs-gpios = <&gpio 4 1>;
-                        #address-cells = <1>;
-                        #size-cells = <0>;
-                        dmas = <&dmamux 19 1>, <&dmamux 20 1>;
-                        dma-names = "tx", "rx";
-
-                        fram0: eeprom@0 {
-                            compatible = "fujitsu,mb85rs1mt", "atmel,at25";
-                            reg = <0>;
-                            spi-max-frequency = <30000000>;
-                            pagesize = <4096>;
-                            size = <131072>;
-                            address-width = <24>;
-                        };
-                };
-        };
-
-        fragment@301 {
-                target = <&spi4_cs_pins>;
-                __overlay__ {
-                        brcm,pins = <4>;
-                        brcm,function = <1>; //<BCM2835_FSEL_GPIO_OUT>;
-                };
-        };
-
          fragment@500 {
                 target = <&i2c1>;
                 __overlay__ {
@@ -390,7 +369,79 @@
 					default-state = "off";
 					linux,default-trigger = "heartbeat";
 				};
+				rs485_1_txled: rs485-1-txled {
+					gpios = <&uleds_gpio 1 1>;
+					default-state = "off";
+					linux,default-trigger = "tty";
+				};
+				rs485_1_rxled: rs485-1-rxled {
+					gpios = <&uleds_gpio 2 1>;
+					default-state = "off";
+					linux,default-trigger = "tty";
+				};
+				rs485_2_txled: rs485-2-txled {
+					gpios = <&uleds_gpio 3 1>;
+					default-state = "off";
+					linux,default-trigger = "tty";
+				};
+				rs485_2_rxled: rs485-2-rxled {
+					gpios = <&uleds_gpio 4 1>;
+					default-state = "off";
+					linux,default-trigger = "tty";
+				};
+				wifi_led: wifi-led {
+					gpios = <&uleds_gpio 5 1>;
+					linux,default-trigger = "netdev";
+				};
+				sim_led: sim-led {
+					gpios = <&uleds_gpio 6 1>;
+					default-state = "off";
+				};
+				net_led: net-led {
+					gpios = <&uleds_gpio 7 1>;
+					default-state = "off";
+				};
+				sig_led: sig-led {
+					gpios = <&uleds_gpio 8 1>;
+					default-state = "off";
+				};
+				int_led: int-led {
+					gpios = <&uleds_gpio 9 1>;
+					default-state = "off";
+				};
+				x1_led: x1-led {
+					gpios = <&uleds_gpio 10 1>;
+					default-state = "off";
+				};
+				x2_led: x2-led {
+					gpios = <&uleds_gpio 11 1>;
+					default-state = "off";
+				};
+				x3_led: x3-led {
+					gpios = <&uleds_gpio 12 1>;
+					default-state = "off";
+				};
+				x4_led: x4-led {
+					gpios = <&uleds_gpio 13 1>;
+					default-state = "off";
+				};
 			};
 		};
 	};
 };
+
+
+
+/delete-node/ &rs485_1_txled;
+/delete-node/ &rs485_1_rxled;
+/delete-node/ &rs485_2_txled;
+/delete-node/ &rs485_2_rxled;
+/delete-node/ &wifi_led;
+/delete-node/ &sim_led;
+/delete-node/ &net_led;
+/delete-node/ &sig_led;
+/delete-node/ &int_led;
+/delete-node/ &x1_led;
+/delete-node/ &x2_led;
+/delete-node/ &x4_led;
+/delete-node/ &x3_led;
