@@ -11,5 +11,9 @@ do_install:append() {
     install -m 755 ${WORKDIR}/mender-inventory-hostinfo ${D}${datadir}/mender/inventory/mender-inventory-hostinfo
 }
 
+# Remove dependency on GPL v3 program parted used in script mender-resize-data-part.sh.
+# Replace parted with sfdisk and partx
 RDEPENDS:mender-update:append:mender-growfs-data:mender-systemd = " util-linux-sfdisk util-linux-partx"
 RDEPENDS:mender-update:remove = "parted"
+
+require mender-tpm2.inc

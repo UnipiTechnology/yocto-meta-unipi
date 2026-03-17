@@ -37,7 +37,8 @@ local_conf_header:
     # password: ppp
     IMAGE_CLASSES:append:pn-mender-image-full-cmdline-rofs = " extrausers"
     PASSWD = "\$5\$2qQtEpyiwk33Lj5/\$KK0mV7X4Mzt15EAo56iymdLUtL9Bbv0HWe8hpUZdhm1"
-    EXTRA_USERS_PARAMS = "usermod -p '${PASSWD}' root;"
+    EXTRA_USERS_PARAMS = "useradd -p '${PASSWD}' unipi; \
+                          usermod -p '${PASSWD}' root;"
 
   diskmon: |
     BB_DISKMON_DIRS = "\
@@ -60,7 +61,11 @@ local_conf_header:
     VIRTUAL-RUNTIME_base-utils-syslog = ""
     # choose one of this extras for real machine
     CORE_IMAGE_EXTRA_INSTALL:append = " packagegroup-machine-base"
-    # CORE_IMAGE_EXTRA_INSTALL:append = " packagegroup-base-extended"
+    #CORE_IMAGE_EXTRA_INSTALL:append = " packagegroup-base-extended"
+    # add tpm packages
+    CORE_IMAGE_EXTRA_INSTALL:append = " packagegroup-security-tpm2"
+    CORE_IMAGE_EXTRA_INSTALL:append = " os-release"
+    #CORE_IMAGE_EXTRA_INSTALL:append = " squashfs-tools erofs-utils"
 
   root-ro: |
     DISTRO_FEATURES:append = " overlayfs"
@@ -73,7 +78,7 @@ local_conf_header:
     OVERLAYFS_ETC_DEVICE = "/dev/mmcblk0p4"
     OVERLAYFS_ETC_USE_ORIG_INIT_NAME = "0"
     OVERLAYFS_ETC_CREATE_MOUNT_DIRS = "0"
-    U_BOOT_SCR_BOOTARGS = "ro init=/sbin/preinit"
+    U_BOOT_SCR_BOOTARGS = "ro init=/sbin/preinit cgroup_enable=memory"
 
     ## non-volatile overlays over /home /root /usr/share/containers/systemd
     OVERLAYFS_MOUNT_POINT[home] = "/data"
@@ -100,6 +105,7 @@ local_conf_header:
     IMAGE_FSTYPES = "sdimg"
     MENDER_STORAGE_TOTAL_SIZE_MB = "1280"
     ARTIFACTIMG_FSTYPE = "ext4"
+    MENDER_DATA_PART_FSTYPE = "ext4"
     MENDER_BOOT_PART_SIZE_MB = "48"
     MENDER_BOOT_PART_MOUNT_LOCATION:unipi_edge = "/boot/firmware"
     MENDER_BOOT_PART_FSTAB_OPTS = "noatime,nodiratime,discard,noauto,x-systemd.automount,sync"
@@ -107,3 +113,4 @@ local_conf_header:
     MENDER_FEATURES_DISABLE:append = " mender-grub mender-image-uefi"
     MENDER_SERVER_URL = "https://eu.hosted.mender.io"
     MENDER_TENANT_TOKEN = "XXXXXXXXXXXXXXXXXXX"
+    XMENDER_AUTH_PRIVATE_KEY = "handle:0x81800001"
