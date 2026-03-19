@@ -1,12 +1,16 @@
 
 SRC_URI:append = " file://ssl-tpm2.cnf \
                    file://tpm2-override.conf \
+                   file://agent-key.conf \
 "
 
 do_install:append() {
     if echo "${XMENDER_AUTH_PRIVATE_KEY}" | grep -q 'handle:'; then
         install -m 644 -D ${WORKDIR}/ssl-tpm2.cnf ${D}${sysconfdir}/ssl/ssl-tpm2.cnf
         install -m 644 -D ${WORKDIR}/tpm2-override.conf ${D}${sysconfdir}/systemd/system/mender-authd.service.d/tpm2-override.conf
+    fi
+    if [ "${XMENDER_AUTH_PRIVATE_KEY}" = "r2k:" ]; then
+        install -m 644 -D ${WORKDIR}/agent-key.conf ${D}${sysconfdir}/systemd/system/mender-authd.service.d/agent-key.conf
     fi
 }
 
@@ -15,6 +19,8 @@ python do_post_prepare_mender_conf() {
     pk = d.getVar('XMENDER_AUTH_PRIVATE_KEY')
     if pk is None or pk == "":
         return
+    if pk == "r2k:":
+        pk = "/run/mender/mender-agent.pem"
 
     src_conf = os.path.join(d.getVar("B"), "persistent_mender.conf")
     node = None
@@ -52,3 +58,7 @@ do_post_prepare_mender_conf[vardeps] = "XMENDER_AUTH_PRIVATE_KEY"
 FILES:mender-auth:append = "${@' ${sysconfdir}/ssl/ssl-tpm2.cnf \
                                  ${sysconfdir}/systemd/system/mender-authd.service.d/tpm2-override.conf' \
                                if str.startswith(d.getVar('XMENDER_AUTH_PRIVATE_KEY'), 'handle:') else ''}"
+FILES:mender-auth:append = "${@' ${sysconfdir}/systemd/system/mender-authd.service.d/agent-key.conf' \
+                               if d.getVar('XMENDER_AUTH_PRIVATE_KEY') == 'r2k:' else ''}"
+
+RDEPENDS:mender-auth:append = "${@bb.utils.contains('XMENDER_AUTH_PRIVATE_KEY','r2k:',' unipi-modbus-tools','',d)}"

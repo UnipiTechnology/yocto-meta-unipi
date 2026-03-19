@@ -57,6 +57,7 @@ local_conf_header:
     LICENSE_FLAGS_ACCEPTED = "synaptics-killswitch"
 
   core: |
+    SPLASH = ""
     VIRTUAL-RUNTIME_syslog = ""
     VIRTUAL-RUNTIME_base-utils-syslog = ""
     # choose one of this extras for real machine
@@ -86,9 +87,9 @@ local_conf_header:
     OVERLAYFS_MOUNT_POINT[root] = "/data"
     OVERLAYFS_WRITABLE_PATHS[root] = "/root"
     OVERLAYFS_QA_SKIP[root] = "mount-configured"
-    OVERLAYFS_MOUNT_POINT[containers] = "/data"
-    OVERLAYFS_WRITABLE_PATHS[containers] = "/usr/share/containers/systemd"
-    OVERLAYFS_QA_SKIP[containers] = "mount-configured"
+    # OVERLAYFS_MOUNT_POINT[containers] = "/data"
+    # OVERLAYFS_WRITABLE_PATHS[containers] = "/usr/share/containers/systemd"
+    # OVERLAYFS_QA_SKIP[containers] = "mount-configured"
 
   e41x: |
     RPI_USE_U_BOOT = "1"
@@ -107,5 +108,5 @@ local_conf_header:
 
     MENDER_FEATURES_DISABLE:append = " mender-grub mender-image-uefi"
     MENDER_SERVER_URL = "https://eu.hosted.mender.io"
-    MENDER_TENANT_TOKEN = "XXXXXXXXXXXXXXXXXXX"
-    XMENDER_AUTH_PRIVATE_KEY = "/run/mender.pem"
+    MENDER_TENANT_TOKEN = "-Sfc_K2Zumhh925bo4vTcVis5wOsLnRExzHP4T7g2_A"
+    XMENDER_AUTH_PRIVATE_KEY = "r2k:"
