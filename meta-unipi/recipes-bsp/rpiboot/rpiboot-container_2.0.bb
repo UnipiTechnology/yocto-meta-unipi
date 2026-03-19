@@ -10,6 +10,7 @@ BOOTIMAGE_RPI_EXTRA_DEPENDS ?= ""
 DEPENDS += "rpiboot-config ${BOOTIMAGE_RPI_EXTRA_DEPENDS} rpi-config"
 
 do_deploy[depends] += " \
+    rpi-config:do_deploy \
     rpi-bootfiles:do_deploy \
     virtual/kernel:do_deploy \
     ${@bb.utils.contains('RPI_USE_U_BOOT', '1', 'u-boot:do_deploy', '', d)} \

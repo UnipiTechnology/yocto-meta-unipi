@@ -40,6 +40,10 @@ enable_uart=1
 force_eeprom_read=0
 disable_poe_fan=1
 
+[pi4]
+# Enable DRM VC4 V3D driver
+#dtoverlay=vc4-kms-v3d-pi4
+
 [cm4]
 # Enable host mode on the 2711 built-in XHCI USB controller.
 # This line should be removed if the legacy DWC2 controller is required
