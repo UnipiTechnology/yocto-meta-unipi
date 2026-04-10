@@ -1,0 +1,20 @@
+#!/bin/sh
+
+# skip if cpu_model was taken by standard mender-inventory-hostinfo
+if grep -q 'model name' /proc/cpuinfo; then
+    exit 0
+fi
+
+if grep -q '^Model' /proc/cpuinfo; then
+    grep '^Model' /proc/cpuinfo | uniq | awk -F': ' '
+        // { printf("cpu_model=%s\n", $2);}
+    '
+    exit 0
+fi
+if [ -r /sys/devices/soc0/family ] || [ -r /sys/devices/soc0/soc_id ]; then
+    printf "cpu_model=%s %s %s\n" \
+      "$(cat /sys/devices/soc0/family 2>/dev/null)" \
+      "$(cat /sys/devices/soc0/soc_id 2>/dev/null)" \
+      "$(cat /sys/devices/soc0/revision 2>/dev/null)"
+    exit 0
+fi
