@@ -6,7 +6,7 @@ SECTION = "base"
 LICENSE = "MIT"
 LIC_FILES_CHKSUM = "file://${COMMON_LICENSE_DIR}/MIT;md5=0835ade698e0bcf8506ecda2f7b4f302"
 
-SRCREV:unipi_edge = "808c91291be96497e26bf05aa64915be16dcd9a6"
+SRCREV:unipi_edge = "3750a267339f039f4a7430390738182d16239eac"
 SRC_URI:unipi_edge = "git://github.com/UniPiTechnology/os-configurator-data-edge.git;protocol=https;branch=main \
 "
 
@@ -36,6 +36,7 @@ do_install:unipi_edge() {
         unipi-e412) urule=e412.rules ;;
         unipi-e413) urule=e413.rules ;;
         unipi-e414) urule=e414.rules ;;
+        unipi-e415) urule=e415.rules ;;
         *) unset urule ;;
     esac
     if [ -n "$urule" ]; then
