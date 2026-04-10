@@ -108,5 +108,6 @@ local_conf_header:
 
     MENDER_FEATURES_DISABLE:append = " mender-grub mender-image-uefi"
     MENDER_SERVER_URL = "https://eu.hosted.mender.io"
-    MENDER_TENANT_TOKEN = "-Sfc_K2Zumhh925bo4vTcVis5wOsLnRExzHP4T7g2_A"
+    MENDER_TENANT_TOKEN = "XXXXXXXXXXXXXXXXXXX"
     XMENDER_AUTH_PRIVATE_KEY = "r2k:"
+    XMENDER_UNIPI_IDENTITY = "1"

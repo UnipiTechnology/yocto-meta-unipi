@@ -5,7 +5,7 @@ header:
   - ./mender-full.yml
   - ./no-dhcpcd.yml
 
-machine: unipi-e410
+machine: unipi-e415
 distro: poky
 target:
   - mender-image-full-cmdline-rofs
@@ -57,13 +57,13 @@ local_conf_header:
     LICENSE_FLAGS_ACCEPTED = "synaptics-killswitch"
 
   core: |
+    SPLASH = ""
     VIRTUAL-RUNTIME_syslog = ""
     VIRTUAL-RUNTIME_base-utils-syslog = ""
     # choose one of this extras for real machine
     CORE_IMAGE_EXTRA_INSTALL:append = " packagegroup-machine-base"
     #CORE_IMAGE_EXTRA_INSTALL:append = " packagegroup-base-extended"
     # add tpm packages
-    CORE_IMAGE_EXTRA_INSTALL:append = " packagegroup-security-tpm2"
     CORE_IMAGE_EXTRA_INSTALL:append = " os-release"
     #CORE_IMAGE_EXTRA_INSTALL:append = " squashfs-tools erofs-utils"
 
@@ -87,13 +87,19 @@ local_conf_header:
     OVERLAYFS_MOUNT_POINT[root] = "/data"
     OVERLAYFS_WRITABLE_PATHS[root] = "/root"
     OVERLAYFS_QA_SKIP[root] = "mount-configured"
-    OVERLAYFS_MOUNT_POINT[containers] = "/data"
-    OVERLAYFS_WRITABLE_PATHS[containers] = "/usr/share/containers/systemd"
-    OVERLAYFS_QA_SKIP[containers] = "mount-configured"
+    # OVERLAYFS_MOUNT_POINT[containers] = "/data"
+    # OVERLAYFS_WRITABLE_PATHS[containers] = "/usr/share/containers/systemd"
+    # OVERLAYFS_QA_SKIP[containers] = "mount-configured"
 
   security: |
     DISTRO_FEATURES:append = " tpm2"
     DISTRO_FEATURES:append = " security"
+    CORE_IMAGE_EXTRA_INSTALL:append = " packagegroup-security-tpm2"
+
+  # fitimage1: |
+    # KERNEL_CLASSES:append = " kernel-fitimage"
+    # KERNEL_IMAGETYPES:append = " fitImage"
+    # FIT_ADDRESS_CELLS = "2"
 
   e41x: |
     RPI_USE_U_BOOT = "1"
@@ -114,3 +120,4 @@ local_conf_header:
     MENDER_SERVER_URL = "https://eu.hosted.mender.io"
     MENDER_TENANT_TOKEN = "XXXXXXXXXXXXXXXXXXX"
     XMENDER_AUTH_PRIVATE_KEY = "handle:0x81800001"
+    XMENDER_UNIPI_IDENTITY = "1"
