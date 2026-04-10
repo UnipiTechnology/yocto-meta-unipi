@@ -14,12 +14,14 @@ SRC_URI += "\
   file://unipi_e412-overlay.dts;subdir=git/arch/arm/boot/dts/overlays\
   file://unipi_e413-overlay.dts;subdir=git/arch/arm/boot/dts/overlays\
   file://unipi_e414-overlay.dts;subdir=git/arch/arm/boot/dts/overlays\
+  file://unipi_e415-overlay.dts;subdir=git/arch/arm/boot/dts/overlays\
   file://unipi_s103-overlay.dts;subdir=git/arch/arm/boot/dts/overlays\
   file://unipi_uboot-overlay.dts;subdir=git/arch/arm/boot/dts/overlays\
   file://unipi_uboot_tpm-overlay.dts;subdir=git/arch/arm/boot/dts/overlays\
   file://disable_wifi-overlay.dts;subdir=git/arch/arm/boot/dts/overlays\
   file://disable_bt-overlay.dts;subdir=git/arch/arm/boot/dts/overlays\
   file://lvc4-kms-v3d-pi4-overlay.dts;subdir=git/arch/arm/boot/dts/overlays\
+  file://unipi_wdt-overlay.dts;subdir=git/arch/arm/boot/dts/overlays\
 "
 
 # To enable local defconfig, we must deactivate  KBUILD_DEFCONFIG

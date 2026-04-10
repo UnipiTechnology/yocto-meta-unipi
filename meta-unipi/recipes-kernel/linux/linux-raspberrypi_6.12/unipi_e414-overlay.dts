@@ -76,6 +76,32 @@
 			model = "Unipi Edge E414";
 		};
 	};
+ 
+	fragment@51 {
+		target = <&spi6_cs_pins>;
+		__overlay__ {
+			brcm,pins = <18>, <23>;
+			brcm,function = <1>; // output input
+			brcm,pull = <0>, <0>;
+		};
+	};
+
+	fragment@52 {
+		target = <&spi6>;
+		__overlay__ {
+			// needed to avoid dtc warning
+			#address-cells = <1>;
+			#size-cells = <0>;
+			compatible = "brcm,bcm2835-spi";
+			pinctrl-names = "default";
+			pinctrl-0 = <&spi6_pins &spi6_cs_pins>;
+			cs-gpios = <&gpio 18 1>, <&gpio 23 1>;
+			dmas = <&dma 23>, <&dma 27>;
+			dma-names = "tx", "rx";
+			status = "okay";
+		};
+	};
+
  	fragment@101 {
 		target-path = "/aliases";
 		__overlay__ {
@@ -129,6 +155,36 @@
 		target = <&minibt>;
 		__overlay__ {
 			status = "okay";
+		};
+	};
+ 
+	fragment@400 {
+		target = <&xhci>;
+		__overlay__ {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			smsc-hub@1 {
+				reg = <1>;
+				compatible = "usb0424,9514";
+				#address-cells = <1>;
+				#size-cells = <0>;
+				ethernet1:eth1@1 {
+					reg = <1>;
+					compatible = "usb0424,ec00";
+				};
+				mpcie:mpcie@2 {
+					reg = <2>;
+				};
+			};
+		};
+	}; 
+
+	fragment@401 {
+		target-path = "/aliases";
+		__overlay__ {
+			// Must be defined absolutly - Tady je problem v ruznuch nazvech usb/xhci v DT mainline/rpi
+			//ethernet1 = "/scb/usb@7e9c0000/smsc-hub@1/eth1@1";
+			ethernet1 = "/scb/xhci@7e9c0000/smsc-hub@1/eth1@1";
 		};
 	};
          fragment@500 {

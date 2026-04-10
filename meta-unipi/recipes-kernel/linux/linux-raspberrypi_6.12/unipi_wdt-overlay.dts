@@ -1,0 +1,61 @@
+/dts-v1/;
+/plugin/;
+
+/ {
+	fragment@1 {
+		target = <&gpio>;
+		__overlay__ {
+			wd_pins: wd-pins {
+				brcm,pins = <27>;
+				brcm,function = <1>; /* output */
+			};
+			reset_pins: reset-pins {
+				brcm,pins = <26>;
+				brcm,function = <1>; /* output */
+			};
+		};
+	};
+
+	fragment@2 {
+		target-path = "/";
+		__overlay__ {
+			wdt_gpio: wdt-gpio {
+				compatible = "linux,wdt-gpio";
+				//always-running;
+				hw_margin_ms = <4000>;
+				hw_algo = "level";
+				pinctrl-names = "default";
+                                timeout-sec = <10>;
+				pinctrl-0 = <&wd_pins>;
+				gpios = <&gpio 27 0>;
+				status = "okay";
+			};
+			gpio_restart: gpio-restart {
+				compatible = "gpio-restart";
+				open-source;
+				gpios = <&gpio 26 0>;
+				priority = <255>; /* <128> or <255> */
+				active-delay = <100>;
+				inactive-delay = <100>;
+				wait-delay = <3000>;
+				pinctrl-names = "default";
+				pinctrl-0 = <&reset_pins>;
+				status = "okay";
+			};
+
+			/* Regulator node to avoid "dummy regulator" messages */
+			vdd3v3_reg: regulator-vdd {
+				compatible = "regulator-fixed";
+				regulator-name = "vdd3v3_reg";
+				regulator-min-microvolt = <3300000>;
+				regulator-max-microvolt = <3300000>;
+			};
+		};
+	};
+	fragment@3 {
+		target-path = "/aliases";
+		__overlay__ {
+			watchdog1 = "/wdt-gpio";
+		};
+	};
+};

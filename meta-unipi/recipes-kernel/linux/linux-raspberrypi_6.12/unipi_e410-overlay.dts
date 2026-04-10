@@ -312,8 +312,8 @@
 			ethernet1 = "/scb/xhci@7e9c0000/smsc-hub@1/eth1@1";
 		};
 	};
-
-	fragment@403 {
+ 
+	fragment@453 {
 		target-path = "/";
 		__overlay__ {
 			lte_kill{
@@ -328,7 +328,7 @@
 		};
 	}; 
 
-	fragment@404 {
+	fragment@454 {
 		target = <&gpio>;
 		__overlay__ {
 			pinctrl_lte_reset: pinctrl-lte-reset {
