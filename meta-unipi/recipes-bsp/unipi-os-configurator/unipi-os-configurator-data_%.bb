@@ -10,6 +10,10 @@ SRCREV:unipi_edge = "3750a267339f039f4a7430390738182d16239eac"
 SRC_URI:unipi_edge = "git://github.com/UniPiTechnology/os-configurator-data-edge.git;protocol=https;branch=main \
 "
 
+SRCREV:unipi_neuron = "ec70c658e49561bc9ddce0291da864585c124194"
+SRC_URI:unipi_neuron = "git://github.com/UniPiTechnology/os-configurator-data-neuron.git;protocol=https;branch=master \
+"
+
 inherit systemd pkgconfig
 
 S = "${WORKDIR}/git"
@@ -22,14 +26,20 @@ PACKAGES =+ " unipi-os-configurator-data-base unipi-os-configurator-data-auto"
 do_configure[noexec] = "1"
 do_compile[noexec] = "1"
 
-do_install:unipi_edge() {
+install_common() {
     install -d ${D}/usr/lib/unipi
     install -m 644 ${S}/unipi_values.py ${D}/usr/lib/unipi
     install -d ${D}/usr/share/unipi-os-configurator/udev
     install -m 644 ${S}/udev/*.rules ${D}/usr/share/unipi-os-configurator/udev
     cp -r ${S}/files/* ${D}
+    rm -rf ${D}/usr/share/initramfs-tools
+    rm -rf ${D}/etc/initramfs-tools
+}
+
+do_install:unipi_edge:append() {
+    install_common
     rm -rf ${D}/usr/lib/tmpfiles.d
-    rm -f ${D}/etc/modprobe.d/neuron-blacklist.conf
+    rm -rf ${D}/etc/modprobe.d
     case "${MACHINE}" in
         unipi-e410) urule=e410.rules ;;
         unipi-e411) urule=e411.rules ;;
@@ -45,17 +55,33 @@ do_install:unipi_edge() {
     fi
 }
 
+do_install:unipi_neuron:append() {
+    install_common
+    rm -rf ${D}/usr/lib/tmpfiles.d
+    rm -rf ${D}/etc/modprobe.d
+    case "${MACHINE}" in
+        unipi-s103) urule=s103.rules ;;
+        *) unset urule ;;
+    esac
+    if [ -n "$urule" ]; then
+        install -d ${D}/etc/udev/rules.d
+        install -m 644 ${S}/udev/$urule ${D}/etc/udev/rules.d/50-$urule
+    fi
+}
+
 FILES:${PN}-base += " \
-    /usr/lib/unipi/fwi2c-check.sh \
     /usr/lib/systemd/network/* \
     /usr/lib/systemd/system.conf.d/* \
     /usr/lib/modprobe.d/* \
     /usr/lib/udev/rules.d \
-    /usr/share/initramfs-tools/modules.d/unipi \
     /etc/sysctl.d/* \
     /etc/udev/rules.d/* \
     /etc/modules-load.d/* \
 "
+FILES:${PN}-base:append:unipi_edge = " \
+    /usr/lib/unipi/fwi2c-check.sh \
+"
+
 FILES:${PN}-auto += "/usr/lib/unipi/unipi_values.py \
     /usr/lib/unipi/run.d/* \
     /usr/share/unipi-os-configurator/* \
