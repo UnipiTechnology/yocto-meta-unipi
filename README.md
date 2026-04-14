@@ -11,13 +11,10 @@ The build environment is orchestrated using [**KAS**](https://github.com/siemens
 
 This BSP is **customer-facing** and currently supports **Unipi Edge** devices only.
 
-The following Unipi Edge models are supported or under active development:
+The following Unipi models are supported or under active development:
 
-- **Unipi Edge E410**
-- **Unipi Edge E411**
-- **Unipi Edge E412**
-- **Unipi Edge E413**
-- **Unipi Edge E414**
+- **Unipi Edge E410 - E415**
+- **Unipi Neuron S103**
 
 > ⚠️ Other Unipi product families are **not supported** by this BSP at this time and require separate BSPs or platform-specific integrations.
 
