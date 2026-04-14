@@ -19,8 +19,10 @@ python do_post_prepare_mender_conf() {
     pk = d.getVar('XMENDER_AUTH_PRIVATE_KEY')
     if pk is None or pk == "":
         return
-    if pk == "r2k:":
-        pk = "/run/mender/mender-agent.pem"
+    if pk.startswith("r2k:"):
+        pk = pk[len('r2k:'):]
+        pk = pk if pk else "mender-agent.pem"
+        pk = f"/run/mender/{pk}"
 
     src_conf = os.path.join(d.getVar("B"), "persistent_mender.conf")
     node = None
@@ -59,6 +61,6 @@ FILES:mender-auth:append = "${@' ${sysconfdir}/ssl/ssl-tpm2.cnf \
                                  ${sysconfdir}/systemd/system/mender-authd.service.d/tpm2-override.conf' \
                                if str.startswith(d.getVar('XMENDER_AUTH_PRIVATE_KEY'), 'handle:') else ''}"
 FILES:mender-auth:append = "${@' ${sysconfdir}/systemd/system/mender-authd.service.d/agent-key.conf' \
-                               if d.getVar('XMENDER_AUTH_PRIVATE_KEY') == 'r2k:' else ''}"
+                               if d.getVar('XMENDER_AUTH_PRIVATE_KEY').startswith('r2k:') else ''}"
 
 RDEPENDS:mender-auth:append = "${@bb.utils.contains('XMENDER_AUTH_PRIVATE_KEY','r2k:',' unipi-modbus-tools','',d)}"
