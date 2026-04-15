@@ -9,7 +9,7 @@ do_install:append() {
         install -m 644 -D ${WORKDIR}/ssl-tpm2.cnf ${D}${sysconfdir}/ssl/ssl-tpm2.cnf
         install -m 644 -D ${WORKDIR}/tpm2-override.conf ${D}${sysconfdir}/systemd/system/mender-authd.service.d/tpm2-override.conf
     fi
-    if [ "${XMENDER_AUTH_PRIVATE_KEY}" = "r2k:" ]; then
+    if echo "${XMENDER_AUTH_PRIVATE_KEY}" | grep -q 'r2k:'; then
         install -m 644 -D ${WORKDIR}/agent-key.conf ${D}${sysconfdir}/systemd/system/mender-authd.service.d/agent-key.conf
     fi
 }
