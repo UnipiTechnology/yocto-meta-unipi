@@ -32,6 +32,7 @@ deviceid=$(uuidgen --sha1 --namespace @x500 --name "$(unipiid product_code)")  #
 
 if [ -n "$deviceid" ]; then
     echo IoTDeviceId=$deviceid
+    exit 0
 fi
 
 # find iface with lowest ifindex, skip non ARPHRD_ETHER types (lo, sit ...)
