@@ -1,0 +1,54 @@
+This README file contains information on the contents of the meta-unipi-eol layer.
+
+Please see the corresponding sections below for details.
+
+Dependencies
+============
+
+  .
+  .
+  .
+
+Patches
+=======
+
+Maintainer: Miroslav Ondra <ondra@unipi.technology>
+
+Table of Contents
+=================
+
+  I. Adding the meta-unipi-eol layer to your build
+ II. Misc
+
+
+I. Adding the meta-unipi layer to your build
+=================================================
+
+Run 'bitbake-layers add-layer meta-unipi-eol'
+
+II. Misc
+========
+Variables to modify behavior of eol test
+
+- UNIPI_EOL_IMAGENAME_CMD
+  The variable contains a command that is run while performing the image-info service and should display the image name on the standard output
+
+- UNIPI_EOL_IMAGEVERSION_CMD
+  The variable contains a command that is run while performing the image-info service and should display the image version on the standard output
+
+- UNIPI_EOL_POSTEXEC_CMD
+  The variable contains a command that can run after the image-info service ends.  Command is inserted to unit definition as
+  ExecPostStop=..., so command must be expressed with full path or use /bin/sh -c '....'.
+  Default is /bin/true.
+
+- UNIPI_EOL_BUILD_INSTALL_CMD
+  This command is executed when generating the image-info package not in the runtime. The string is inserted into the install() function.
+  The working directory and destination directory ${D} need to be taken into account.
+
+
+! Do not use " and # in variables, They are pre-processed by sed!
+
+Service image-info.service is installed into /etc/systemd/system or
+into ${OVERLAYFS_ETC_MOUNT_POINT}/overlay-etc/systemd/system if variable OVERLAYFS_ETC_MOUNT_POINT is defined.
+This service runs during the first boot. It waits for expected network, collects informations about image and
+sends it to predefined api. Finally, the service is disabled and removed regardless of the result of the service running.

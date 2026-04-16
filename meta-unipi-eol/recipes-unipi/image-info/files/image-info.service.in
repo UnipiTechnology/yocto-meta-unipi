@@ -1,0 +1,60 @@
+[Unit]
+Description=Collect image info and send it to API
+DefaultDependencies=yes
+ConditionVirtualization=No
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+# default values for api
+Environment=api=http://10.1.1.1:8041
+Environment=api_ip=10.1.1.
+# load overrides from FAT partition
+ExecStartPre=-/bin/cat /boot/firmware/api-vars.env
+EnvironmentFile=-/boot/firmware/api-vars.env
+
+# load OS-RELEASE
+EnvironmentFile=-/etc/os-release
+# Prepare format of json.
+# ----------------------
+# Required items:
+#   confirm:
+#       name: <api_id>
+#       value: true
+#       message:
+#           image: <>
+#           version: <>
+#
+# More items can be defined under key message
+Environment=format='{"confirm": {"name": "%%s", "value": "true", "message":{\
+"image": "%%s",\
+"version": "%%s",\
+"os": {\
+"Distributor":"%%s",\
+"Codename":"%%s",\
+"Release":"%%s"}\
+}}}'
+
+# wait for ATE machine is visible on network
+ExecStartPre=/bin/sh -c 'i=30; until ip addr show dev eth0|grep -q "inet $api_ip"; do if test $i -le 0; then exit 1; fi; i=$((i-1)); sleep 1; done'
+
+# create json using defined format and send it to api
+ExecStart=-sh -c 'printf "$format" \
+  "${api_id:-boot-$(unipiid product_serial)}" \
+  "$(@@UNIPI_EOL_IMAGENAME_CMD@@)" \
+  "$(@@UNIPI_EOL_IMAGEVERSION_CMD@@)" \
+  "$NAME" \
+  "$VERSION_CODENAME" \
+  "$VERSION_ID" > /run/api.json'
+ExecStart=-/usr/bin/curl -s --json @/run/api.json "$api"'
+#ExecStart=-/usr/bin/wget -q --post-file /run/api.json -O- "$api"
+
+# clean scripts
+ExecStopPost=-find /etc/systemd/system -name image-info.service -delete
+ExecStopPost=-/bin/rm -f /boot/firmware/api-vars.env
+ExecStopPost=-@@UNIPI_EOL_POSTEXEC_CMD@@
+ExecStopPost=-/usr/bin/sync
+
+[Install]
+WantedBy=multi-user.target

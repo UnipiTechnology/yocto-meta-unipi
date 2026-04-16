@@ -4,6 +4,7 @@ header:
   - ./base.yml
   - ./mender-full.yml
   - ./no-dhcpcd.yml
+  - ./unipi-eol.yml
 
 machine: unipi-e415
 distro: poky

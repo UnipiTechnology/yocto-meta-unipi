@@ -1,0 +1,14 @@
+header:
+  version: 1
+
+repos:
+  meta-unipi-eol:
+    path: meta-unipi-eol
+
+local_conf_header:
+  image_info: |
+    CORE_IMAGE_EXTRA_INSTALL:append = " image-info"
+    UNIPI_EOL_IMAGENAME_CMD = "mender-update show-artifact || true"
+    UNIPI_EOL_IMAGEVERSION_CMD = "mender-update show-provides | sed -n s/rootfs-image.checksum=//p || true "
+    UNIPI_EOL_POSTEXEC_CMD = "/usr/bin/systemctl unmask mender-updated.service"
+    UNIPI_EOL_BUILD_INSTALL_CMD = "ln -s /dev/null ${D}${OVERLAYFS_ETC_MOUNT_POINT}/overlay-etc/upper/systemd/system/mender-updated.service"
