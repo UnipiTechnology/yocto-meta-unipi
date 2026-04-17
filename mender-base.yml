@@ -12,6 +12,7 @@ repos:
 
 env:
     MENDER_ARTIFACT_NAME: "baseos"
+    MENDER_TENANT_TOKEN: "your specific token"
 
 local_conf_header:
   base: |

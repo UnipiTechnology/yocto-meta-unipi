@@ -42,4 +42,4 @@ do_install() {
 
 FILES:${PN} = "${UNIPI_EOL_DESTINATION}"
 
-RDEPENDS:${PN} += " curl"
+RDEPENDS:${PN} += " curl os-release"

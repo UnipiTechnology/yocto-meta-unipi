@@ -57,10 +57,10 @@ python do_post_prepare_mender_conf() {
 addtask do_post_prepare_mender_conf after do_prepare_mender_conf before do_install
 do_post_prepare_mender_conf[vardeps] = "XMENDER_AUTH_PRIVATE_KEY"
 
-FILES:mender-auth:append = "${@' ${sysconfdir}/ssl/ssl-tpm2.cnf \
+FILES:mender-config:append = "${@' ${sysconfdir}/ssl/ssl-tpm2.cnf \
                                  ${sysconfdir}/systemd/system/mender-authd.service.d/tpm2-override.conf' \
                                if str.startswith(d.getVar('XMENDER_AUTH_PRIVATE_KEY'), 'handle:') else ''}"
-FILES:mender-auth:append = "${@' ${sysconfdir}/systemd/system/mender-authd.service.d/agent-key.conf' \
+FILES:mender-config:append = "${@' ${sysconfdir}/systemd/system/mender-authd.service.d/agent-key.conf' \
                                if d.getVar('XMENDER_AUTH_PRIVATE_KEY').startswith('r2k:') else ''}"
 
-RDEPENDS:mender-auth:append = "${@bb.utils.contains('XMENDER_AUTH_PRIVATE_KEY','r2k:',' unipi-modbus-tools','',d)}"
+RDEPENDS:mender-config:append = "${@bb.utils.contains('XMENDER_AUTH_PRIVATE_KEY','r2k:',' unipi-modbus-tools','',d)}"
