@@ -28,7 +28,7 @@ min=65535
 arphrd_ether=1
 ifdev=
 
-deviceid=$(uuidgen --sha1 --namespace @x500 --name "$(unipiid product_code)")  #"
+deviceid="$(unipiid product_code)"
 
 if [ -n "$deviceid" ]; then
     echo IoTDeviceId=$deviceid
