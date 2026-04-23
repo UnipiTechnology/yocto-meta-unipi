@@ -47,7 +47,7 @@ ExecStart=-sh -c 'printf "$format" \
   "$NAME" \
   "$VERSION_CODENAME" \
   "$VERSION_ID" > /run/api.json'
-ExecStart=-/usr/bin/curl -s --json @/run/api.json "$api"'
+ExecStart=-/usr/bin/curl -s --json @/run/api.json "$api"
 #ExecStart=-/usr/bin/wget -q --post-file /run/api.json -O- "$api"
 
 # clean scripts
