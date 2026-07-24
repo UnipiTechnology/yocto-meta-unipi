@@ -44,12 +44,14 @@ ExecStart=-sh -c 'printf "$format" \
   "$NAME" \
   "$VERSION_CODENAME" \
   "$VERSION_ID" > /run/api.json'
-ExecStart=-/usr/bin/curl -s --json @/run/api.json "$api"
 
 # clean scripts
-ExecStopPost=-find /etc/systemd/system -name image-info.service -delete
 ExecStopPost=-@@UNIPI_EOL_POSTEXEC_CMD@@
-ExecStopPost=-/usr/bin/sync
+ExecStopPost=-/bin/sh -c 'set +e; \
+  find /etc/systemd/system -name image-info.service -delete && \
+  /usr/bin/sync && \
+  /usr/bin/curl -s --json @/run/api.json "$api"'
+
 
 [Install]
 WantedBy=multi-user.target
