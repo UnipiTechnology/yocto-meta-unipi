@@ -10,9 +10,6 @@ Type=oneshot
 # default values for api
 Environment=api=http://10.1.1.1:8041
 Environment=api_ip=10.1.1.
-# load overrides from FAT partition
-ExecStartPre=-/bin/cat /boot/firmware/api-vars.env
-EnvironmentFile=-/boot/firmware/api-vars.env
 
 # load OS-RELEASE
 EnvironmentFile=-/etc/os-release
@@ -47,14 +44,14 @@ ExecStart=-sh -c 'printf "$format" \
   "$NAME" \
   "$VERSION_CODENAME" \
   "$VERSION_ID" > /run/api.json'
-ExecStart=-/usr/bin/curl -s --json @/run/api.json "$api"
-#ExecStart=-/usr/bin/wget -q --post-file /run/api.json -O- "$api"
 
 # clean scripts
-ExecStopPost=-find /etc/systemd/system -name image-info.service -delete
-ExecStopPost=-/bin/rm -f /boot/firmware/api-vars.env
 ExecStopPost=-@@UNIPI_EOL_POSTEXEC_CMD@@
-ExecStopPost=-/usr/bin/sync
+ExecStopPost=-/bin/sh -c 'set +e; \
+  find /etc/systemd/system -name image-info.service -delete && \
+  /usr/bin/sync && \
+  /usr/bin/curl -s --json @/run/api.json "$api"'
+
 
 [Install]
 WantedBy=multi-user.target
